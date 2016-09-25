@@ -2,6 +2,9 @@
 Program Name: optimal_growth_stochastic.jl
 This program generates the value function and decision
 rules for a stochastic growth model.
+Adapted from Sargent and Stachurski Quantitative
+Economics Lectures (original authors: Spencer Lyon,
+Victoria Gregory)
 =#
 
 using Optim: optimize
@@ -22,7 +25,7 @@ dist_bad = [0.074 (1-0.074)]
 ## Asset Grid
 grid_upper = 45
 grid_size = 1800
-grid = 1e-6:(grid_upper-1e-6)/(grid_size-1):grid_upper
+grid = 0.01:(grid_upper-1e-6)/(grid_size-1):grid_upper
 
 #= Bellman operator
 
@@ -42,7 +45,7 @@ function bellman_operator(w_good,w_bad,z,cond_dist::Array{Float64,2})
         objective(kprime) = - log(z*(k^alpha) + (1-delta)*k-kprime) -
           beta * (cond_dist[1]*Aw_good[kprime] +
           cond_dist[2]*Aw_bad[kprime])
-        res = optimize(objective, 0, z*(k^alpha) + (1-delta)*k)
+        res = optimize(objective, k, z*(k^alpha) + (1-delta)*k)
         Tw[i] = - objective(res.minimum)
     end
     return Tw
@@ -82,7 +85,6 @@ function fixed_point(T::Function; err_tol=1e-4,
 end
 
 v_star = fixed_point(bellman_operator)
-v_star_good = v_star[1]
 
 ## Obtain policy function
 
@@ -102,16 +104,49 @@ function policy_function(w_good,w_bad,z,cond_dist::Array{Float64,2})
     return policy
 end
 
-policyfunction_good = policy_function(v_star[1],v_star[2],z_good,dist_good)
-policyfunction_bad = policy_function(v_star[1],v_star[2],z_bad,dist_bad)
+policyfunction_good = policy_function(v_star[1],v_star[2]
+,z_good,dist_good)
+policyfunction_bad = policy_function(v_star[1],v_star[2]
+,z_bad,dist_bad)
 
 ## Plots
 
-plot(grid,v_star[1],color="blue",linewidth=2.0,label="Value Function (Good State)")
-plot(grid,v_star[2],color="red",linewidth=2.0,label="Value Function (Bad State)")
+  ## Value Functions
 
-plot(grid,policyfunction_good,color="blue",linewidth=2.0,label="Policy Function (Good State)")
-plot(grid,policyfunction_bad,color="red",linewidth=2.0,label="Policy Function (Bad State)")
+  valfig = figure()
+  plot(grid,v_star[1],color="blue",linewidth=2.0,label="Good State")
+  plot(grid,v_star[2],color="red",linewidth=2.0,label="Bad State")
+  xlabel("K")
+  ylabel("V(K|Z)")
+  legend(loc="lower right")
+  title("Value Functions")
+  ax = PyPlot.gca()
+  ax[:set_ylim]((-175,0))
+  savefig("C:/Users/j0el/Documents/Wisconsin/899/Problem Sets/Week 2/Pictures/valuefunctions.pgf")
 
-plot(grid,policyfunction_good-grid,color="blue",linewidth=2.0,label="K' - K (Good State)")
-plot(grid,policyfunction_bad-grid,color="red",linewidth=2.0,label="K' - K (Bad State)")
+  ## Policy Functions
+
+  polfig = figure()
+  plot(grid,policyfunction_good,color="blue",linewidth=2.0,label="Good State")
+  plot(grid,policyfunction_bad,color="red",linewidth=2.0,label="Bad State")
+  xlabel("K")
+  ylabel("K'(K)")
+  legend(loc="lower right")
+  title("Policy Functions")
+  ax = PyPlot.gca()
+  ax[:set_ylim]((0,45))
+  savefig("C:/Users/j0el/Documents/Wisconsin/899/Problem Sets/Week 2/Pictures/policyfunctions.pgf")
+
+
+  ## K' - K
+
+  differencefig = figure()
+  plot(grid,policyfunction_good-grid,color="blue",linewidth=2.0,label="Good State")
+  plot(grid,policyfunction_bad-grid,color="red",linewidth=2.0,label="Bad State")
+  xlabel("K")
+  ylabel("K'-K")
+  legend(loc="lower right")
+  title("Change in Policy Functions (K'-K)")
+  ax = PyPlot.gca()
+  ax[:set_ylim]((-2.5,2.5))
+  savefig("C:/Users/j0el/Documents/Wisconsin/899/Problem Sets/Week 2/Pictures/deltapolicyfunctions.pgf")
