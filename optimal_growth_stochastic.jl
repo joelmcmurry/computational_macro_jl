@@ -105,6 +105,8 @@ end
 policyfunction_good = policy_function(v_star[1],v_star[2],z_good,dist_good)
 policyfunction_bad = policy_function(v_star[1],v_star[2],z_bad,dist_bad)
 
+## Plots
+
 plot(grid,v_star[1],color="blue",linewidth=2.0,label="Value Function (Good State)")
 plot(grid,v_star[2],color="red",linewidth=2.0,label="Value Function (Bad State)")
 
