@@ -25,7 +25,7 @@ dist_bad = [0.074 (1-0.074)]
 ## Asset Grid
 grid_upper = 45
 grid_size = 1800
-grid = 0.01:(grid_upper-1e-6)/(grid_size-1):grid_upper
+grid = 1e-6:(grid_upper-1e-6)/(grid_size-1):grid_upper
 
 #= Bellman operator
 
@@ -45,7 +45,7 @@ function bellman_operator(w_good,w_bad,z,cond_dist::Array{Float64,2})
         objective(kprime) = - log(z*(k^alpha) + (1-delta)*k-kprime) -
           beta * (cond_dist[1]*Aw_good[kprime] +
           cond_dist[2]*Aw_bad[kprime])
-        res = optimize(objective, k, z*(k^alpha) + (1-delta)*k)
+        res = optimize(objective, 0, z*(k^alpha) + (1-delta)*k)
         Tw[i] = - objective(res.minimum)
     end
     return Tw
@@ -136,7 +136,6 @@ policyfunction_bad = policy_function(v_star[1],v_star[2]
   ax = PyPlot.gca()
   ax[:set_ylim]((0,45))
   savefig("C:/Users/j0el/Documents/Wisconsin/899/Problem Sets/Week 2/Pictures/policyfunctions.pgf")
-
 
   ## K' - K
 
