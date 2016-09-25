@@ -1,10 +1,7 @@
 #=
-Program Name: optimal_growth.jl
+Program Name: optimal_growth_stochastic.jl
 This program generates the value function and decision
-rules for a nonstochastic growth model.
-Adapted from Sargent and Stachurski Quantitative
-Economics Lectures (original authors: Spencer Lyon,
-Victoria Gregory)
+rules for a stochastic growth model.
 =#
 
 using Optim: optimize
@@ -15,6 +12,11 @@ using PyPlot
 beta = 0.99
 delta = 0.025
 alpha = 0.36
+
+## Stochastic Production Function Parameters
+z_good = 1.25
+z_bad = 0.2
+trans_matrix = [0.977 (1-0.977); 0.074 (1-0.074)]
 
 ## Asset Grid
 grid_upper = 45
