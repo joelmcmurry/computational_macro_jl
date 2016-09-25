@@ -23,7 +23,7 @@ grid_upper = 45
 grid_size = 1800
 grid = 1e-6:(grid_upper-1e-6)/(grid_size-1):grid_upper
 
-#= Bellman operator
+#= Bellman operator###
 
 The Bellman Operator function takes as an input the interpolated value function w
 defined on the grid points and solves max[u(k,k') + beta*w(k')] where k' is chosen
