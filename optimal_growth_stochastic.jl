@@ -108,8 +108,8 @@ policyfunction_bad = policy_function(v_star[1],v_star[2],z_bad,dist_bad)
 plot(grid,v_star[1],color="blue",linewidth=2.0,label="Value Function (Good State)")
 plot(grid,v_star[2],color="red",linewidth=2.0,label="Value Function (Bad State)")
 
-#plot(grid,policyfunction_good,color="blue",linewidth=2.0,label="Policy Function (Good State)")
-#plot(grid,policyfunction_bad,color="red",linewidth=2.0,label="Policy Function (Bad State)")
+plot(grid,policyfunction_good,color="blue",linewidth=2.0,label="Policy Function (Good State)")
+plot(grid,policyfunction_bad,color="red",linewidth=2.0,label="Policy Function (Bad State)")
 
-#plot(grid,policyfunction_good-grid,color="blue",linewidth=2.0,label="K' - K (Good State)")
-#plot(grid,policyfunction_bad-grid,color="red",linewidth=2.0,label="K' - K (Bad State)")
+plot(grid,policyfunction_good-grid,color="blue",linewidth=2.0,label="K' - K (Good State)")
+plot(grid,policyfunction_bad-grid,color="red",linewidth=2.0,label="K' - K (Bad State)")
