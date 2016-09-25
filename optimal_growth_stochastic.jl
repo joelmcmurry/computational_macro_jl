@@ -16,14 +16,15 @@ alpha = 0.36
 ## Stochastic Production Function Parameters
 z_good = 1.25
 z_bad = 0.2
-trans_matrix = [0.977 (1-0.977); 0.074 (1-0.074)]
+dist_good = [0.977 (1-0.977)]
+dist_bad = [0.074 (1-0.074)]
 
 ## Asset Grid
 grid_upper = 45
 grid_size = 1800
 grid = 1e-6:(grid_upper-1e-6)/(grid_size-1):grid_upper
 
-#= Bellman operator###
+#= Bellman operator
 
 The Bellman Operator function takes as an input the interpolated value function w
 defined on the grid points and solves max[u(k,k') + beta*w(k')] where k' is chosen
@@ -31,36 +32,44 @@ from the interpolated grid points
 Exploit the monotonicity of the policy rule to only search for k' > k
 =#
 
-function bellman_operator(w)
-    Aw = CoordInterpGrid(grid, w, BCnan, InterpLinear)
+function bellman_operator(w_good,w_bad,z,cond_dist::Array{Float64,2})
+    Aw_good = CoordInterpGrid(grid, w_good, BCnan, InterpLinear)
+    Aw_bad = CoordInterpGrid(grid, w_bad, BCnan, InterpLinear)
 
     Tw = zeros(grid_size)
 
     for (i, k) in enumerate(grid)
-        objective(kprime) = - log(k^alpha + (1-delta)*k-kprime) - beta * Aw[kprime]
-        res = optimize(objective, 0, k^alpha + (1-delta)*k)
+        objective(kprime) = - log(z*(k^alpha) + (1-delta)*k-kprime) -
+          beta * (cond_dist[1]*Aw_good[kprime] +
+          cond_dist[2]*Aw_bad[kprime])
+        res = optimize(objective, 0, z*(k^alpha) + (1-delta)*k)
         Tw[i] = - objective(res.minimum)
     end
     return Tw
 end
 
-## Find a fixed point of the Bellman Operator (it is a contraction so we are guaranteed existence)
+## Find a fixed point of the Bellman Operator
 
 function fixed_point(T::Function; err_tol=1e-4,
                                  max_iter=1000, verbose=true, print_skip=10)
-    w = zeros(grid)
+    w_good = zeros(grid)
+    w_bad = zeros(grid)
     iterate = 0
     error = err_tol + 1
     while iterate < max_iter && error > err_tol
-        w_next = T(w)
+        w_good_next = T(w_good,w_bad,z_good,dist_good)
+        w_bad_next = T(w_bad,w_bad,z_bad,dist_bad)
         iterate += 1
-        error = Base.maxabs(w_next - w)
+        error_good = Base.maxabs(w_good_next - w_good)
+        error_bad = Base.maxabs(w_bad_next - w_bad)
+        error = max(error_good,error_bad)
         if verbose
             if iterate % print_skip == 0
                 println("Compute iterate $iterate with error $error")
             end
         end
-        w = w_next
+        w_good = w_good_next
+        w_bad = w_bad_next
     end
 
     if iterate < max_iter && verbose
@@ -69,27 +78,38 @@ function fixed_point(T::Function; err_tol=1e-4,
         warn("max_iter exceeded in fixed_point")
     end
 
-    return w
+    return w_good, w_bad
 end
 
 v_star = fixed_point(bellman_operator)
+v_star_good = v_star[1]
 
 ## Obtain policy function
 
-function policy_function(w)
-    Aw = CoordInterpGrid(grid, w, BCnan, InterpLinear)
+function policy_function(w_good,w_bad,z,cond_dist::Array{Float64,2})
+    Aw_good = CoordInterpGrid(grid, w_good, BCnan, InterpLinear)
+    Aw_bad = CoordInterpGrid(grid, w_bad, BCnan, InterpLinear)
 
     policy = zeros(grid_size)
 
     for (i, k) in enumerate(grid)
-        objective(kprime) = - log(k^alpha + (1-delta)*k-kprime) - beta * Aw[kprime]
-        res = optimize(objective, 0, k^alpha + (1-delta)*k)
+        objective(kprime) = - log(z*(k^alpha) + (1-delta)*k-kprime) -
+          beta * (cond_dist[1]*Aw_good[kprime] +
+          cond_dist[2]*Aw_bad[kprime])
+        res = optimize(objective, 0, z*(k^alpha) + (1-delta)*k)
         policy[i] = res.minimum
     end
     return policy
 end
 
-policyfunction = policy_function(v_star)
+policyfunction_good = policy_function(v_star[1],v_star[2],z_good,dist_good)
+policyfunction_bad = policy_function(v_star[1],v_star[2],z_bad,dist_bad)
 
-plot(grid,v_star,color="blue",linewidth=2.0,label="Value Function")
-plot(grid,policyfunction,color="blue",linewidth=2.0,label="Policy Function")
+plot(grid,v_star[1],color="blue",linewidth=2.0,label="Value Function (Good State)")
+plot(grid,v_star[2],color="red",linewidth=2.0,label="Value Function (Bad State)")
+
+#plot(grid,policyfunction_good,color="blue",linewidth=2.0,label="Policy Function (Good State)")
+#plot(grid,policyfunction_bad,color="red",linewidth=2.0,label="Policy Function (Bad State)")
+
+#plot(grid,policyfunction_good-grid,color="blue",linewidth=2.0,label="K' - K (Good State)")
+#plot(grid,policyfunction_bad-grid,color="red",linewidth=2.0,label="K' - K (Bad State)")
