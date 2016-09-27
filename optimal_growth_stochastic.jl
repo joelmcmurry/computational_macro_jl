@@ -32,7 +32,6 @@ grid = 1e-6:(grid_upper-1e-6)/(grid_size-1):grid_upper
 The Bellman Operator function takes as an input the interpolated value function w
 defined on the grid points and solves max[u(k,k') + beta*w(k')] where k' is chosen
 from the interpolated grid points
-Exploit the monotonicity of the policy rule to only search for k' > k
 =#
 
 function bellman_operator(w_good,w_bad,z,cond_dist::Array{Float64,2})
