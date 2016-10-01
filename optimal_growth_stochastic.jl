@@ -60,7 +60,7 @@ function fixed_point(T::Function; err_tol=1e-4,
     error = err_tol + 1
     while iterate < max_iter && error > err_tol
         w_good_next = T(w_good,w_bad,z_good,dist_good)
-        w_bad_next = T(w_bad,w_bad,z_bad,dist_bad)
+        w_bad_next = T(w_good,w_bad,z_bad,dist_bad)
         iterate += 1
         error_good = Base.maxabs(w_good_next - w_good)
         error_bad = Base.maxabs(w_bad_next - w_bad)
