@@ -26,7 +26,7 @@ end
 ## Outer Constructor for Huggett
 
 function Huggett(;beta::Float64=0.9932, alpha::Float64=1.5,
-  q::Float64=0.02, a_min::Float64=-2.0, a_max::Float64=5.0,
+  q::Float64=0.9, a_min::Float64=-2.0, a_max::Float64=5.0,
   a_size::Int64=100, markov=[0.97 (1-0.97);0.5 (1-0.5)],
   s_vals = [1, 0.5])
 
