@@ -4,12 +4,10 @@ Adapated from code by Daisuke Oyama, Spencer Lyon, and Matthew Mckay
 available at QuantEcon.net
 =#
 
-using QuantEcon: s_wise_max
-
 #= Type Discrete Dynamic Program. Inputs are current return matrix,
   transition matrix, and discount factor =#
 
-type DiscreteDP{T<:Real,NQ,NR,Tbeta<:Real,Tind}
+type DiscreteDP{T<:Real,NQ,NR,Tbeta<:Real}
   R::Array{T,NR} ## current return matrix
   Q::Array{T,NQ} ## transition matrix (3 dimensional)
   beta::Tbeta ## discount factor
@@ -33,7 +31,7 @@ type DiscreteDP{T<:Real,NQ,NR,Tbeta<:Real,Tind}
         end
 
         # check feasibility
-        R_max = s_wise_max(R)
+        R_max = vec(maximum(R,2))
         if any(R_max .== -Inf)
             # First state index such that all actions yield -Inf
             state = find(R_max .== -Inf) #-Only Gives True
@@ -48,34 +46,76 @@ end
 ## Constructor for DiscreteDP object
 
 DiscreteDP{T,NQ,NR,Tbeta}(R::Array{T,NR}, Q::Array{T,NQ}, beta::Tbeta) =
-    DiscreteDP{T,NQ,NR,Tbeta,Int}(R, Q, beta)
+    DiscreteDP{T,NQ,NR,Tbeta}(R, Q, beta)
+
+## Type DPSolveResult which holds results of the problems
+
+  ## abstract type DDPAlgorithm
+
+  abstract DDPAlgorithm
+
+type DPSolveResult{Algo<:DDPAlgorithm,Tval<:Real}
+    v::Vector{Tval}
+    Tv::Array{Tval}
+    num_iter::Int
+    sigma::Array{Int,1}
+    markov::MarkovChain
+
+    function DPSolveResult(ddp::DiscreteDP)
+        v = vec(maximum(ddp.R,2)) # Initialise value with current return max
+        ddpr = new(v, similar(v), 0, similar(v, Int))
+
+        # Fill in sigma with proper policy values
+        #(bellman_operator!(ddp, ddpr); ddpr.sigma)
+        ddpr
+    end
+
+    # method to pass initial value function (skip the initialization)
+    function DPSolveResult(ddp::DiscreteDP, v::Vector)
+        ddpr = new(v, similar(v), 0, similar(v, Int))
+
+        # Fill in sigma with proper policy values
+        #(bellman_operator!(ddp, ddpr); ddpr.sigma)
+        ddpr
+    end
+end
 
 ## Bellman Operator
 
 function bellman_operator!(ddp::DiscreteDP, v::Vector,
   Tv::Vector, sigma::Vector)
     vals = ddp.R + ddp.beta * ddp.Q * v
-    find_policy(ddp, vals, Tv, sigma)
+    rowwise_max!(vals, Tv, sigma)
     Tv, sigma
 end
 
-## Find optimal policy
+#= Simplify input, telling the function to output Tv and sigma
+to our results type=#
 
-function find_policy!(vals::AbstractMatrix, out::Vector,
+bellman_operator!(ddp::DiscreteDP, ddpr::DPSolveResult) =
+  bellman_operator!(ddp, ddpr.v, ddpr.Tv, ddpr.sigma)
+
+#= Find optimal policy. Iterate over each row (state) and column (action)
+to find the highest valued column (action) for that row (state).
+The output is a vector of maximized values for each row (state)
+and their column (action) indices in the matrix
+=#
+
+function rowwise_max!(vals::AbstractMatrix, out::Vector,
     out_argmax::Vector)
-    # naive implementation where I just iterate over the rows
-    nr, nc = size(vals)
-    for i_r in 1:nr
+
+    num_row, num_col = size(vals)
+    for row_index in 1:num_row
         # reset temporaries
         cur_max = -Inf
-        out_argmax[i_r] = 1
+        out_argmax[row_index] = 1
 
-        for i_c in 1:nc
-            @inbounds v_rc = vals[i_r, i_c]
-            if v_rc > cur_max
-                out[i_r] = v_rc
-                out_argmax[i_r] = i_c
-                cur_max = v_rc
+        for col_index in 1:num_col
+            @inbounds val_rowcol = vals[row_index, col_index]
+            if val_rowcol > cur_max
+                out[row_index] = val_rowcol
+                out_argmax[row_index] = col_index
+                cur_max = val_rowcol
             end
         end
 
@@ -83,18 +123,9 @@ function find_policy!(vals::AbstractMatrix, out::Vector,
     out, out_argmax
 end
 
-# ## Bellman Operator
+## Value Function Iteration
 #
-# function bellman_operator!(ddp::DiscreteDP, v::Vector,
-#   Tv::Vector, sigma::Vector)
-#     vals = ddp.R + ddp.beta * ddp.Q * v
-#     find_policy(ddp, vals, Tv, sigma)
-#     Tv, sigma
-# end
-#
-# ## Value Function Iteration
-#
-# function vfi(ddp::DiscreteDP, ddpr::DPSolveResult{VFI},
+# function vfi(ddp::DiscreteDP, ddpr::DPSolveResult,
 #   max_iter::Integer, epsilon::Real, k::Integer)
 #     if ddp.beta == 0.0
 #         tol = Inf
@@ -104,7 +135,7 @@ end
 #
 #     for i in 1:max_iter
 #         # updates Tv in place
-#         bellman_operator(ddp, ddpr)
+#         bellman_operator!(ddp, ddpr)
 #
 #         # compute error and update the v inside ddpr
 #         err = maxabs(ddpr.Tv .- ddpr.v)
