@@ -5,7 +5,8 @@ available at QuantEcon.net
 =#
 
 #= Type Discrete Dynamic Program. Inputs are current return matrix,
-  transition matrix, and discount factor =#
+  transition matrix, and discount factor. Object is this triple
+  after error checking =#
 
 type DiscreteProgram{T<:Real,NQ,NR,Tbeta<:Real}
   R::Array{T,NR} ## current return matrix
@@ -43,19 +44,22 @@ type DiscreteProgram{T<:Real,NQ,NR,Tbeta<:Real}
     end
 end
 
-## Constructor for DiscreteProgram object
+#= Constructor for DiscreteProgram object. This is needed because the
+inner constructor above is only defined for particular
+DiscreteProgram{T,NQ,NR,Tbeta} and not the general DiscreteProgram.
+Outer constructor defines method for general DiscreteProgram (which
+only applies to inputs with the proper types). =#
 
-DiscreteProgram{T,NQ,NR,Tbeta}(R::Array{T,NR}, Q::Array{T,NQ}, beta::Tbeta) =
-    DiscreteProgram{T,NQ,NR,Tbeta}(R, Q, beta)
+DiscreteProgram{T,NQ,NR,Tbeta}(R::Array{T,NR}, Q::Array{T,NQ},
+  beta::Tbeta) = DiscreteProgram{T,NQ,NR,Tbeta}(R, Q, beta)
 
-## Type DPResult which holds results of the problems
+## Type DPResult which holds results of the problem
 
 type DPResult{Tval<:Real}
     v::Vector{Tval}
     Tv::Array{Tval}
     num_iter::Int
     sigma::Array{Int,1}
-    #markov::MarkovChain
 
     function DPResult(ddp::DiscreteProgram)
         v = vec(maximum(ddp.R,2)) # Initialise value with current return max
@@ -66,32 +70,67 @@ type DPResult{Tval<:Real}
         ddpr
     end
 
-    # method to pass initial value function (skip the initialization)
-    function DPResult(ddp::DiscreteProgram, v::Vector)
-        ddpr = new(v, similar(v), 0, similar(v, Int))
-
-        # Fill in sigma with proper policy values
-        (bellman_operator!(ddp, ddpr); ddpr.sigma)
-        ddpr
-    end
 end
+
+## Solve Discrete Dynamic Program
+
+function SolveProgram{T}(ddp::DiscreteProgram; max_iter::Integer=250,
+    epsilon::Real=1e-3)
+    ddpr = DPResult{T}(ddp)
+    vfi!(ddp, ddpr, max_iter, epsilon)
+    ddpr
+end
+
+##########= INTERNAL UTILITIES =##########
 
 ## Bellman Operator
 
+#= v is an initial guess of value, Tv is updated value and is
+overwritten, sigma is policy rule and is overwritten =#
+
 function bellman_operator!(ddp::DiscreteProgram, v::Vector,
   Tv::Vector, sigma::Vector)
-    vals = ddp.R + ddp.beta * ddp.Q * v
+    vals = ddp.R + ddp.beta * (ddp.Q * v)
     rowwise_max!(vals, Tv, sigma)
     Tv, sigma
 end
 
 #= Simplify input, telling the function to output Tv and sigma
-to our results type=#
+to our results structure ddpr =#
 
 bellman_operator!(ddp::DiscreteProgram, ddpr::DPResult) =
   bellman_operator!(ddp, ddpr.v, ddpr.Tv, ddpr.sigma)
 
-#= Find optimal policy. Iterate over each row (state) and column (action)
+## Value Function Iteration
+
+function vfi!(ddp::DiscreteProgram, ddpr::DPResult,
+  max_iter::Integer, epsilon::Real)
+    if ddp.beta == 0.0
+        tol = Inf
+    else
+        tol = epsilon * (1-ddp.beta) / (2*ddp.beta)
+    end
+
+    for i in 1:max_iter
+        # updates Tv and sigma in place
+        bellman_operator!(ddp, ddpr)
+
+        # compute error and update the value with Tv inside ddpr
+        err = maxabs(ddpr.Tv .- ddpr.v)
+        copy!(ddpr.v, ddpr.Tv)
+        ddpr.num_iter += 1
+
+        if err < tol
+            break
+        end
+    end
+
+    ddpr
+end
+
+## Find optimal policy
+
+#=Iterate over each row (state) and column (action)
 to find the highest valued column (action) for that row (state).
 The output is a vector of maximized values for each row (state)
 and their column (action) indices in the matrix
@@ -119,29 +158,23 @@ function rowwise_max!(vals::AbstractMatrix, out::Vector,
     out, out_argmax
 end
 
-## Value Function Iteration
-#
-# function vfi(ddp::DiscreteProgram, ddpr::DPResult,
-#   max_iter::Integer, epsilon::Real, k::Integer)
-#     if ddp.beta == 0.0
-#         tol = Inf
-#     else
-#         tol = epsilon * (1-ddp.beta) / (2*ddp.beta)
-#     end
-#
-#     for i in 1:max_iter
-#         # updates Tv in place
-#         bellman_operator!(ddp, ddpr)
-#
-#         # compute error and update the v inside ddpr
-#         err = maxabs(ddpr.Tv .- ddpr.v)
-#         copy!(ddpr.v, ddpr.Tv)
-#         ddpr.num_iter += 1
-#
-#         if err < tol
-#             break
-#         end
-#     end
-#
-#     ddpr
-# end
+## Q*v (taken directly from QuantEcon)
+
+#= We want to be able to take the inner product of v and each
+``third dimension" column in Q. Recall that each point in
+two dimensions on Q represents a state and a choice. The
+third dimension is a distribution over states tomorrow given
+the state today and choice. Thus, the inner product of that
+conditional distribution and v gives the expected value for
+being in the conditioning state and choosing the conditioning
+action =#
+
+function *{T}(A::Array{T,3}, v::Vector)
+  shape = size(A)
+  size(v,1) == shape[end] || error("wrong dimensions")
+
+  B = reshape(A, prod(shape[1:end-1]), shape[end])
+  out = B*v
+
+  return reshape(out, shape[1:end-1])
+end

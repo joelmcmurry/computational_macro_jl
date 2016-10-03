@@ -6,6 +6,8 @@ Adapated from code by Victoria Gregory available at QuantEcon.net
 
 using QuantEcon: gridmake
 
+## Create compostive type ``Huggett"
+
 type Huggett
   beta :: Float64 ## discount rate
   alpha :: Float64 ## risk aversion
@@ -23,7 +25,8 @@ type Huggett
   N :: Int64 ## number of possible (a,s) combinations
 end
 
-## Outer Constructor for Huggett
+#= Outer Constructor for Huggett. Supplies default values, field
+names, and creates grid objects=#
 
 function Huggett(;beta::Float64=0.9932, alpha::Float64=1.5,
   q::Float64=0.9, a_min::Float64=-2.0, a_max::Float64=5.0,
@@ -63,11 +66,15 @@ function Huggett(;beta::Float64=0.9932, alpha::Float64=1.5,
 
   ## Current return matrix
 
+  ## initialize matrix
   R = fill(-Inf,N,a_size)
 
+  ## create instance of Huggett with intialized matrix
   huggett = Huggett(beta, alpha, q, R, Q, a_min, a_max, a_size,
   a_vals, s_size, markov, a_s_vals, a_s_indices, N)
 
+  #= construct current return matrix based on instance
+  =#
   curr_return!(huggett, q)
 
   return huggett
@@ -92,8 +99,7 @@ function curr_return!(huggett::Huggett, q::Float64)
         end
     end
 
-    huggett.q = q
+    # Replace initial current return matrix with constructed matrix
     huggett.R = R
-    #huggett This seems vestigal. Kill it if no problems
 
 end
