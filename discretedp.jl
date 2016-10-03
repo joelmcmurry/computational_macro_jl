@@ -74,8 +74,8 @@ end
 
 ## Solve Discrete Dynamic Program
 
-function SolveProgram{T}(ddp::DiscreteProgram; max_iter::Integer=250,
-    epsilon::Real=1e-3)
+function SolveProgram{T}(ddp::DiscreteProgram{T};
+  max_iter::Integer=250, epsilon::Real=1e-3)
     ddpr = DPResult{T}(ddp)
     vfi!(ddp, ddpr, max_iter, epsilon)
     ddpr
@@ -168,6 +168,8 @@ the state today and choice. Thus, the inner product of that
 conditional distribution and v gives the expected value for
 being in the conditioning state and choosing the conditioning
 action =#
+
+import Base.*
 
 function *{T}(A::Array{T,3}, v::Vector)
   shape = size(A)
