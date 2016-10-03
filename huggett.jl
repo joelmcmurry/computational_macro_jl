@@ -4,7 +4,7 @@ DESCRIBE THIS STUFF
 Adapated from code by Victoria Gregory available at QuantEcon.net
 =#
 
-using QuantEcon
+using QuantEcon: gridmake
 
 type Huggett
   beta :: Float64 ## discount rate

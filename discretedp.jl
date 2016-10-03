@@ -7,12 +7,12 @@ available at QuantEcon.net
 #= Type Discrete Dynamic Program. Inputs are current return matrix,
   transition matrix, and discount factor =#
 
-type DiscreteDP{T<:Real,NQ,NR,Tbeta<:Real}
+type DiscreteProgram{T<:Real,NQ,NR,Tbeta<:Real}
   R::Array{T,NR} ## current return matrix
   Q::Array{T,NQ} ## transition matrix (3 dimensional)
   beta::Tbeta ## discount factor
 
-    function DiscreteDP(R::Array, Q::Array, beta::Real)
+    function DiscreteProgram(R::Array, Q::Array, beta::Real)
         # verify input integrity 1
         if NQ != 3
             msg = "Q must be 3-dimensional without state-action formulation"
@@ -43,46 +43,42 @@ type DiscreteDP{T<:Real,NQ,NR,Tbeta<:Real}
     end
 end
 
-## Constructor for DiscreteDP object
+## Constructor for DiscreteProgram object
 
-DiscreteDP{T,NQ,NR,Tbeta}(R::Array{T,NR}, Q::Array{T,NQ}, beta::Tbeta) =
-    DiscreteDP{T,NQ,NR,Tbeta}(R, Q, beta)
+DiscreteProgram{T,NQ,NR,Tbeta}(R::Array{T,NR}, Q::Array{T,NQ}, beta::Tbeta) =
+    DiscreteProgram{T,NQ,NR,Tbeta}(R, Q, beta)
 
-## Type DPSolveResult which holds results of the problems
+## Type DPResult which holds results of the problems
 
-  ## abstract type DDPAlgorithm
-
-  abstract DDPAlgorithm
-
-type DPSolveResult{Algo<:DDPAlgorithm,Tval<:Real}
+type DPResult{Tval<:Real}
     v::Vector{Tval}
     Tv::Array{Tval}
     num_iter::Int
     sigma::Array{Int,1}
-    markov::MarkovChain
+    #markov::MarkovChain
 
-    function DPSolveResult(ddp::DiscreteDP)
+    function DPResult(ddp::DiscreteProgram)
         v = vec(maximum(ddp.R,2)) # Initialise value with current return max
         ddpr = new(v, similar(v), 0, similar(v, Int))
 
         # Fill in sigma with proper policy values
-        #(bellman_operator!(ddp, ddpr); ddpr.sigma)
+        (bellman_operator!(ddp, ddpr); ddpr.sigma)
         ddpr
     end
 
     # method to pass initial value function (skip the initialization)
-    function DPSolveResult(ddp::DiscreteDP, v::Vector)
+    function DPResult(ddp::DiscreteProgram, v::Vector)
         ddpr = new(v, similar(v), 0, similar(v, Int))
 
         # Fill in sigma with proper policy values
-        #(bellman_operator!(ddp, ddpr); ddpr.sigma)
+        (bellman_operator!(ddp, ddpr); ddpr.sigma)
         ddpr
     end
 end
 
 ## Bellman Operator
 
-function bellman_operator!(ddp::DiscreteDP, v::Vector,
+function bellman_operator!(ddp::DiscreteProgram, v::Vector,
   Tv::Vector, sigma::Vector)
     vals = ddp.R + ddp.beta * ddp.Q * v
     rowwise_max!(vals, Tv, sigma)
@@ -92,7 +88,7 @@ end
 #= Simplify input, telling the function to output Tv and sigma
 to our results type=#
 
-bellman_operator!(ddp::DiscreteDP, ddpr::DPSolveResult) =
+bellman_operator!(ddp::DiscreteProgram, ddpr::DPResult) =
   bellman_operator!(ddp, ddpr.v, ddpr.Tv, ddpr.sigma)
 
 #= Find optimal policy. Iterate over each row (state) and column (action)
@@ -125,7 +121,7 @@ end
 
 ## Value Function Iteration
 #
-# function vfi(ddp::DiscreteDP, ddpr::DPSolveResult,
+# function vfi(ddp::DiscreteProgram, ddpr::DPResult,
 #   max_iter::Integer, epsilon::Real, k::Integer)
 #     if ddp.beta == 0.0
 #         tol = Inf
