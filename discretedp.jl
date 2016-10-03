@@ -67,6 +67,7 @@ type DPResult{Tval<:Real}
 
         # Fill in sigma with proper policy values
         (bellman_operator!(ddp, ddpr); ddpr.sigma)
+
         ddpr
     end
 
