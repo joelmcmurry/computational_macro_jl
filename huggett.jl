@@ -100,6 +100,8 @@ function curr_return!(huggett::Huggett, q::Float64)
     end
 
     # Replace initial current return matrix with constructed matrix
+    huggett.q = q
     huggett.R = R
+    huggett
 
 end
