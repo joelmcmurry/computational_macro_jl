@@ -203,7 +203,7 @@ num_iter = 0
       end
   end
 
-Tstar, statdist, num_iter
+  Tstar, statdist, num_iter
 
 end
 
