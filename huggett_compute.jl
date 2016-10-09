@@ -5,50 +5,54 @@ Program Name: huggett_compute.jl
 include("huggett.jl")
 include("discretedp.jl")
 
-## parameters
+compute_huggett()
 
-max_iter = 100
-max_iter_vfi = 2000
-epsilon = 1e-3
+function compute_huggett(;q0=0.9,max_iter=100,
+  max_iter_vfi=2000,epsilon=1e-3,a_size=100)
 
-tic()
+  #tic()
 
-## Start with a guess for the discount bond price
+  ## Start with a guess for the discount bond price
 
-q = 0.5
+  q = q0
 
-## Instantiate Huggett model
+  ## Instantiate Huggett model
 
-huggett = Huggett(q=q)
+  huggett = Huggett(q=q,a_size=a_size)
 
-## Create Dynamic Program
+  ## Create Dynamic Program
 
-huggettdp = DiscreteProgram(huggett.R,huggett.Q,huggett.beta)
+  huggettdp = DiscreteProgram(huggett.R,huggett.Q,huggett.beta)
 
-for i in 1:max_iter
+  for i in 1:max_iter
 
-  # Solve dynamic program given q
-  huggettres = SolveProgram(huggettdp,max_iter_vfi=max_iter_vfi)
+    # Solve dynamic program given q
+    huggettres = SolveProgram(huggettdp,max_iter_vfi=max_iter_vfi)
 
-  # Calculate net asset holdings using stationary distribution
-  net_assets = dot(huggett.a_vals[huggettres.sigma],
-    huggettres.statdist)
+    # Calculate net asset holdings using stationary distribution
+    net_assets = dot(huggett.a_vals[huggettres.sigma],
+      huggettres.statdist)
 
-  # Adjust q (and stop if asset market clears)
-  if abs(net_assets) < epsilon
-      break
-  elseif net_assets > 0
-    qprime = q + (1-q)/2
-  else
-    qprime = q/2
+    # Adjust q (and stop if asset market clears)
+    if abs(net_assets) < epsilon
+        break
+    elseif net_assets > 0
+      qprime = q + (1-q)/2
+    else
+      qprime = q/2
+    end
+    q = qprime
+
+    # Update current return matrix given new q
+    curr_return!(huggett,q)
+
+    # Replace current return matrix in dynamic program
+    huggettdp.R = huggett.R
+    println("Iter: ", i, " Net Assets: ", net_assets," q: ", q)
+
   end
-  q = qprime
+  #toc()
 
-  # Update current return matrix given new q
-  curr_return!(huggett,q)
-
-  # Replace current return matrix in dynamic program
-  huggettdp.R = huggett.R
+return huggett, huggettres, net_assets, q
 
 end
-toc()
