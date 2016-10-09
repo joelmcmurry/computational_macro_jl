@@ -159,6 +159,54 @@ function rowwise_max!(vals::AbstractMatrix, out::Vector,
     out, out_argmax
 end
 
+## Find Stationary distribution
+
+function create_statdist!(ddp::DiscreteProgram, ddpr::DPResult;
+  max_iter::Integer=250, epsilon::Real=1e-3)
+
+N = size(ddp.R)[1]
+m = size(ddp.R)[2]
+
+#= Create transition matrix Tstar that is N x N, where N is the number
+of states. Each row of Tstar is a conditional distribution over
+states tomorrow conditional on the state today defined by row index =#
+
+Tstar = spzeros(N,N)
+
+for state in 1:N
+  for choice in 1:m
+    if ddpr.sigma[state] == choice
+      Tstar[state,:] = ddp.Q[state,choice,:]
+    end
+  end
+end
+
+#= Find stationary distribution. Start with a uniform distribution over
+states and feed through Tstar matrix until convergence=#
+
+# initialize with uniform distribution over states
+statdist = ones(N)*(1/N)
+
+num_iter = 0
+
+  for i in 1:max_iter
+
+      statdistprime = Tstar'*statdist
+
+      # compute error and update stationary distribution
+      err = maxabs(statdistprime .- statdist)
+      copy!(statdist, statdistprime)
+      num_iter += 1
+
+      if err < epsilon
+          break
+      end
+  end
+
+Tstar, statdist, num_iter
+
+end
+
 ## Q*v (taken directly from QuantEcon)
 
 #= We want to be able to take the inner product of v and each
