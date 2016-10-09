@@ -15,7 +15,7 @@ huggettdp = DiscreteProgram(huggett.R,huggett.Q,huggett.beta)
 
 ## Solve Dynamic Program to yield value function and policy function
 
-huggettres = SolveProgram(huggettdp,max_iter=2000)
+huggettres = SolveProgram(huggettdp,max_iter_vfi=2000)
 
 ## Policy function is in terms of indices. Extract asset holding rule
 

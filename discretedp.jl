@@ -60,13 +60,14 @@ type DPResult{Tval<:Real}
     Tv::Array{Tval}
     num_iter::Int
     sigma::Array{Int,1}
+    statdist::Array{Tval}
 
     function DPResult(ddp::DiscreteProgram)
         v = vec(maximum(ddp.R,2)) # Initialise value with current return max
-        ddpr = new(v, similar(v), 0, similar(v, Int))
+        ddpr = new(v, similar(v), 0, similar(v, Int), similar(v))
 
         # Fill in sigma with proper policy values
-        (bellman_operator!(ddp, ddpr); ddpr.sigma)
+        #(bellman_operator!(ddp, ddpr); ddpr.sigma)
 
         ddpr
     end
@@ -76,9 +77,11 @@ end
 ## Solve Discrete Dynamic Program
 
 function SolveProgram{T}(ddp::DiscreteProgram{T};
-  max_iter::Integer=250, epsilon::Real=1e-3)
+  max_iter_vfi::Integer=250, epsilon_vfi::Real=1e-3,
+  max_iter_statdist::Integer=250, epsilon_statdist::Real=1e-3)
     ddpr = DPResult{T}(ddp)
-    vfi!(ddp, ddpr, max_iter, epsilon)
+    vfi!(ddp, ddpr, max_iter_vfi, epsilon_vfi)
+    create_statdist!(ddp, ddpr, max_iter_statdist, epsilon_statdist)
     ddpr
 end
 
@@ -161,8 +164,8 @@ end
 
 ## Find Stationary distribution
 
-function create_statdist!(ddp::DiscreteProgram, ddpr::DPResult;
-  max_iter::Integer=250, epsilon::Real=1e-3)
+function create_statdist!(ddp::DiscreteProgram, ddpr::DPResult,
+  max_iter::Integer, epsilon::Real)
 
 N = size(ddp.R)[1]
 m = size(ddp.R)[2]
@@ -203,7 +206,9 @@ num_iter = 0
       end
   end
 
-  Tstar, statdist, num_iter
+  ddpr.statdist = statdist
+
+  ddpr
 
 end
 
