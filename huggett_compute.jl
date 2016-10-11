@@ -4,11 +4,10 @@ Program Name: huggett_compute.jl
 
 using PyPlot
 
-include("huggett.jl")
-include("discretedp.jl")
+include("huggett_new.jl")
 
-function compute_huggett(;q0=0.9,max_iter=1,
-  max_iter_vfi=2000,epsilon=1e-2,a_size=100)
+function compute_huggett(;q0=0.9,max_iter=100,
+  max_iter_vfi=2000,epsilon=1e-2,a_size=500)
 
   #= Instantiate Huggett model with a starting guess for
   discount bond price and an initialized net_asset level.

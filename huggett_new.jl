@@ -1,9 +1,4 @@
-#=New Attempt at Huggett=#
-
-## To Do: figure out scope in Bellman equation. What does it write to?
-
-
-
+#=Huggett Model and Utilities=#
 
 using QuantEcon: gridmake
 
@@ -50,16 +45,16 @@ function Primitives(;beta::Float64=0.9932, alpha::Float64=1.5,
 
 end
 
-## Type Result which holds results of the problem
+## Type Results which holds results of the problem
 
-type Result
+type Results
     v::Array{Float64,2}
     Tv::Array{Float64,2}
     num_iter::Int
     sigma::Array{Int,2}
     statdist::Array{Float64}
 
-    function Result(prim::Primitives)
+    function Results(prim::Primitives)
         v = zeros(prim.a_size,prim.s_size) # Initialise value with zeroes
         statdist = ones(prim.N)*(1/prim.N)# Initialize stationary distribution with uniform
         res = new(v, similar(v), 0, similar(v, Int), statdist)
@@ -71,20 +66,19 @@ end
 ## Solve Discrete Dynamic Program
 
 function SolveProgram(prim::Primitives;
-  max_iter_vfi::Integer=250, epsilon_vfi::Real=1e-3,
-  max_iter_statdist::Integer=250, epsilon_statdist::Real=1e-5)
-    res = Result(prim)
+  max_iter_vfi::Integer=500, epsilon_vfi::Real=1e-3,
+  max_iter_statdist::Integer=500, epsilon_statdist::Real=1e-3)
+    res = Results(prim)
     vfi!(prim, res, max_iter_vfi, epsilon_vfi)
     create_statdist!(prim, res, max_iter_statdist, epsilon_statdist)
-    ddpr
+    res
 end
 
 #= Internal Utilities =#
 
 ## Bellman Operator
 
-function bellman_operator!(prim::Primitives, v::Array{Float64,2},
-  out_Tv::Array{Float64,2}, out_sigma::Array{Int64,2})
+function bellman_operator!(prim::Primitives, v::Array{Float64,2})
   # initialize
   Tv = fill(-Inf,(prim.a_size,prim.s_size))
   sigma = zeros(prim.a_size,prim.s_size)
@@ -111,20 +105,12 @@ function bellman_operator!(prim::Primitives, v::Array{Float64,2},
         Tv[asset_index,state_index] = max_value
       end
   end
-  out_Tv = Tv
-  out_sigma = sigma
-  out_Tv, out_sigma
+  Tv, sigma
 end
-
-#= Simplify input, telling the function to output Tv and sigma
-to our results structure =#
-
-bellman_operator!(prim::Primitives, res::Result) =
-  bellman_operator!(prim, res.v, res.Tv, res.sigma)
 
 ## Value Function Iteration
 
-function vfi!(prim::Primitives, res::Result,
+function vfi!(prim::Primitives, res::Results,
   max_iter::Integer, epsilon::Real)
     if prim.beta == 0.0
         tol = Inf
@@ -134,7 +120,7 @@ function vfi!(prim::Primitives, res::Result,
 
     for i in 1:max_iter
         # updates Tv and sigma in place
-        bellman_operator!(prim, res.v)
+        res.Tv, res.sigma = bellman_operator!(prim,res.v)
 
         # compute error and update the value with Tv inside results
         err = maxabs(res.Tv .- res.v)
@@ -151,35 +137,34 @@ end
 
 ## Find Stationary distribution
 
-function create_statdist!(prim::Primitives, res::Result,
+function create_statdist!(prim::Primitives, res::Results,
   max_iter::Integer, epsilon::Real)
 
 N = prim.N
 m = prim.a_size
 
 #= Create transition matrix Tstar that is N x N, where N is the number
-of states. Each row of Tstar is a conditional distribution over
-states tomorrow conditional on the state today defined by row index =#
+of (a,s) combinations. Each row of Tstar is a conditional distribution over
+(a',s') conditional on the (a,s) today defined by row index =#
 
 Tstar = spzeros(N,N)
 
-for asset_index in 1:prim.a_size
-  for state_index in 1:prim.s_size
-    for
-
-for state in 1:N
-  for choice in 1:m
-    if res.sigma[state] == choice
-      Tstar[state,:] = ddp.Q[state,choice,:]
+for state_today in 1:N
+  choice_index = res.sigma[prim.a_s_indices[state_today,1],
+  prim.a_s_indices[state_today,2]] #a' given (a,s)
+  for state_tomorrow in 1:N
+    if prim.a_s_indices[state_tomorrow,1] == choice_index
+      Tstar[state_today,state_tomorrow] =
+        prim.markov[prim.a_s_indices[state_today,2]
+        ,prim.a_s_indices[state_tomorrow,2]]
     end
   end
 end
 
-#= Find stationary distribution. Start with a uniform distribution over
+#= Find stationary distribution. Start with any distribution over
 states and feed through Tstar matrix until convergence=#
 
-# initialize with uniform distribution over states
-statdist = ones(N)*(1/N)
+statdist = res.statdist
 
 num_iter = 0
 
@@ -197,8 +182,8 @@ num_iter = 0
       end
   end
 
-  ddpr.statdist = statdist
+  res.statdist = statdist
 
-  ddpr
+  res
 
 end
