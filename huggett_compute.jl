@@ -71,7 +71,7 @@ net_assets, q, prim, results
 end
 
 tic()
-results = compute_huggett(q0=0.9932,max_iter=100,a_size=1000)
+results = compute_huggett(q0=0.9932,max_iter=100,a_size=2000)
 toc()
 
 huggett = results[3]
