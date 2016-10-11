@@ -7,67 +7,37 @@ using PyPlot
 include("huggett_new.jl")
 
 function compute_huggett(;q0=0.9,max_iter=100,
-  max_iter_vfi=2000,epsilon=1e-2,a_size=500)
+  max_iter_vfi=2000,epsilon=1e-3,a_size=500)
 
-  #= Instantiate primitives of model with a starting guess for
-  discount bond price. We will want to keep track of the price
-  last period 'pmin1' for the convergence process=#
+  #= Instantiate primitives of model with a starting range for
+  discount bond price=#
 
-  q = q0
-  qmin1 = 1
+  qlower = q0
+  qupper = 1
 
+  q = (qlower + qupper)/2
+
+  # Initialize primitives
   prim = Primitives(q=q,a_size=a_size)
 
-  ## Solve dynamic program given initial q
+  # Initial guess for value function
+  v = zeros(prim.a_size,prim.s_size)
 
-  results = SolveProgram(prim,max_iter_vfi=max_iter_vfi)
+  # Initialize net assets
+  net_assets::Float64 = 10.0
 
-  ## Calculate net asset holdings for initial q
-
-  net_assets = 0
-
-  for state in 1:N
-    holdings = results.statdist[state]*
-    prim.a_vals[results.sigma[prim.a_s_indices[state,1],
-    prim.a_s_indices[state,2]]] #asset choice times density at that state
-    net_assets += holdings
-  end
-
-  # Print initial net assets and discount bond price
-  println("Iter: ", 0, " Net Assets: ", net_assets," q: ", q)
+  # Initialize results structure
+  results = Results(prim)
 
   for i in 1:max_iter
 
-    # Adjust q (and stop if asset market clears)
-    if abs(net_assets) < epsilon
-        break
-    elseif net_assets > 0 # q too small
-      if q > qmin1
-        qprime = q + abs(q - qmin1)
-      else
-        qprime = (q + qmin1)/2
-      end
-    else # q too big
-      if q > qmin1
-        qprime = (q + qmin1)/2
-      else
-        qprime = q - abs(q - qmin1)
-      end
-    end
-    qmin1 = q
-    q = qprime
-
-    # Update primitives given new q
-    prim.q = q
-
     # Solve dynamic program given new q
-    results = SolveProgram(prim,max_iter_vfi=max_iter_vfi)
+    results = SolveProgram(prim,v,max_iter_vfi=max_iter_vfi)
 
     # Calculate net assets given new q
-
     net_assets = 0
 
-    for state in 1:N
+    for state in 1:prim.N
       holdings = results.statdist[state]*
       prim.a_vals[results.sigma[prim.a_s_indices[state,1],
       prim.a_s_indices[state,2]]] #asset choice times density at that state
@@ -77,14 +47,31 @@ function compute_huggett(;q0=0.9,max_iter=100,
     # Print iteration, net assets, and discount bond price
     println("Iter: ", i, " Net Assets: ", net_assets," q: ", q)
 
+    # Adjust q (and stop if asset market clears)
+    if abs(net_assets) < epsilon
+        break
+    elseif net_assets > 0 # q too small
+      qlower = q
+    else # q too big
+      qupper = q
+    end
+
+    q = (qlower + qupper)/2
+
+    # Update primitives given new q
+    prim.q = q
+
+    # Update guess for value function
+    v = results.Tv
+
   end
 
-return net_assets, q, results
+net_assets, q, results
 
 end
 
 tic()
-huggett_results = compute_huggett(q0=0.8)
+huggett_results = compute_huggett(q0=0.9,max_iter=500,a_size=1000)
 toc()
 
 huggett = results[6]

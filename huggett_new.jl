@@ -53,11 +53,20 @@ type Results
     num_iter::Int
     sigma::Array{Int,2}
     statdist::Array{Float64}
+    num_dist::Int
 
     function Results(prim::Primitives)
         v = zeros(prim.a_size,prim.s_size) # Initialise value with zeroes
         statdist = ones(prim.N)*(1/prim.N)# Initialize stationary distribution with uniform
-        res = new(v, similar(v), 0, similar(v, Int), statdist)
+        res = new(v, similar(v), 0, similar(v, Int), statdist,0)
+
+        res
+    end
+
+    # Version w/ initial v
+    function Results(prim::Primitives,v::Array{Float64,2})
+        statdist = ones(prim.N)*(1/prim.N)# Initialize stationary distribution with uniform
+        res = new(v, similar(v), 0, similar(v, Int), statdist,0)
 
         res
     end
@@ -65,10 +74,21 @@ end
 
 ## Solve Discrete Dynamic Program
 
+# Without initial value function (will be initialized at zeros)
 function SolveProgram(prim::Primitives;
   max_iter_vfi::Integer=500, epsilon_vfi::Real=1e-3,
   max_iter_statdist::Integer=500, epsilon_statdist::Real=1e-3)
     res = Results(prim)
+    vfi!(prim, res, max_iter_vfi, epsilon_vfi)
+    create_statdist!(prim, res, max_iter_statdist, epsilon_statdist)
+    res
+end
+
+# With Initial value function
+function SolveProgram(prim::Primitives, v::Array{Float64,2};
+  max_iter_vfi::Integer=500, epsilon_vfi::Real=1e-3,
+  max_iter_statdist::Integer=500, epsilon_statdist::Real=1e-3)
+    res = Results(prim, v)
     vfi!(prim, res, max_iter_vfi, epsilon_vfi)
     create_statdist!(prim, res, max_iter_statdist, epsilon_statdist)
     res
@@ -90,6 +110,8 @@ function bellman_operator!(prim::Primitives, v::Array{Float64,2})
 
         max_value = -Inf # initialize value for (a,s) combination
 
+          #= exploit monotonicity of policy function and only look for
+          choices above current asset level =#
           for choice_index in 1:prim.a_size
             aprime = prim.a_vals[choice_index]
             c = s + a - prim.q*aprime
@@ -115,7 +137,7 @@ function vfi!(prim::Primitives, res::Results,
     if prim.beta == 0.0
         tol = Inf
     else
-        tol = epsilon * (1-prim.beta) / (2*prim.beta)
+        tol = epsilon
     end
 
     for i in 1:max_iter
@@ -183,6 +205,7 @@ num_iter = 0
   end
 
   res.statdist = statdist
+  res.num_dist = num_iter
 
   res
 
