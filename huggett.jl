@@ -49,7 +49,7 @@ function Huggett(;beta::Float64=0.9932, alpha::Float64=1.5,
   point gives us the distribution over the N states (a',s') conditional on
   being in state (a,s) (length index) and choosing a' (width index)=#
 
-  Q = zeros(Float64, N, a_size, N)
+  Q = spzeros(Float64, N, a_size, N)
   for stateprime_index in 1:N
       for choice_index in 1:a_size
           for state_index in 1:N
