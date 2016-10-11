@@ -85,25 +85,23 @@ function bellman_operator!(ddp::DiscreteProgram, v::Vector,
     Tv, sigma
 end
 
-# function bellman_operator!(ddp::DiscreteProgram, v::Vector,
-#   Tv::Vector, sigma::Vector)
-#   # initialize
-#   for i in 1:states
-#
-#       for j in 1:choices
-#         if R[i,j] > 0
-#           value = R[i,j] + beta*(markov )
-#           if value > max_value
-#             max_value = value
-#           end
-#         end
-#
-#       end
-#   end
-#     vals = ddp.R + ddp.beta * (ddp.Q * v)
-#     rowwise_max!(vals, Tv, sigma)
-#     Tv, sigma
-# end
+function bellman_operator!(ddp::DiscreteProgram, v::Vector,
+  Tv::Vector, sigma::Vector)
+  # initialize
+  value = inf or something
+  # find max
+  for i in 1:states
+      for j in 1:choices
+        if R[i,j] > 0
+          value = R[i,j] + beta*(markov )
+          if value > max_value
+            max_value = value
+          end
+        end
+
+      end
+  end
+end
 
 #= Simplify input, telling the function to output Tv and sigma
 to our results structure ddpr =#
