@@ -13,7 +13,7 @@ type Huggett
   alpha :: Float64 ## risk aversion
   q :: Float64 ## interest rate
   R :: Array{Float64} ## current return matrix
-  Q :: Array{Float64} ## transition matrix (3 dimensional)
+  Q :: SparseMatrixCSC{Float64} ## transition matrix (3 dimensional)
   a_min :: Float64 ## minimum asset value
   a_max :: Float64 ## maximum asset value
   a_size :: Int64 ## size of asset grid

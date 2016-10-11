@@ -12,28 +12,12 @@ available at QuantEcon.net
 
 type DiscreteProgram{T<:Real,NQ,NR,Tbeta<:Real}
   R::Array{T,NR} ## current return matrix
-  Q::Array{T,NQ} ## transition matrix (3 dimensional)
+  Q::SparseMatrixCSC{T,NQ} ## transition matrix (3 dimensional)
   beta::Tbeta ## discount factor
 
     function DiscreteProgram(R::Array, Q::Array, beta::Real)
-        # verify input integrity 1
-        if NQ != 3
-            msg = "Q must be 3-dimensional without state-action formulation"
-            throw(ArgumentError(msg))
-        end
-        if NR != 2
-            msg = "R must be 2-dimensional without state-action formulation"
-            throw(ArgumentError(msg))
-        end
-        (beta < 0 || beta >= 1) &&  throw(ArgumentError("beta must be [0, 1)"))
 
-        # verify input integrity 2
-        num_states, num_actions = size(R)
-        if size(Q) != (num_states, num_actions, num_states)
-            throw(ArgumentError("shapes of R and Q must be (N,M) and (N,M,N)"))
-        end
-
-        # check feasibility
+        # check feasibility of current returns
         R_max = vec(maximum(R,2))
         if any(R_max .== -Inf)
             # First state index such that all actions yield -Inf
@@ -52,7 +36,7 @@ DiscreteProgram{T,NQ,NR,Tbeta} and not the general DiscreteProgram.
 Outer constructor defines method for general DiscreteProgram (which
 only applies to inputs with the proper types). =#
 
-DiscreteProgram{T,NQ,NR,Tbeta}(R::Array{T,NR}, Q::Array{T,NQ},
+DiscreteProgram{T,NQ,NR,Tbeta}(R::Array{T,NR}, Q::SparseMatrixCSC{T,NQ},
   beta::Tbeta) = DiscreteProgram{T,NQ,NR,Tbeta}(R, Q, beta)
 
 ## Type DPResult which holds results of the problem
@@ -247,7 +231,7 @@ action =#
 
 import Base.*
 
-function *{T}(A::Array{T,3}, v::Vector)
+function *{T}(A::SparseMatrixCSC{T,3}, v::Vector)
   shape = size(A)
   size(v,1) == shape[end] || error("wrong dimensions")
 
