@@ -102,17 +102,23 @@ function bellman_operator!(prim::Primitives, v::Array{Float64,2})
   # initialize
   Tv = fill(-Inf,(prim.a_size,prim.s_size))
   sigma = zeros(prim.a_size,prim.s_size)
+
   # find max value for each (a,s) combination
-  for asset_index in 1:prim.a_size
-    a = prim.a_vals[asset_index]
-      for state_index in 1:prim.s_size
-        s = prim.s_vals[state_index]
+  for state_index in 1:prim.s_size
+    s = prim.s_vals[state_index]
 
-        max_value = -Inf # initialize value for (a,s) combination
+    #= exploit monotonicity of policy function and only look for
+    asset choices above the choice for previous asset level =#
 
-          #= exploit monotonicity of policy function and only look for
-          choices above current asset level =#
-          for choice_index in 1:prim.a_size
+    # Initialize lower bound of asset choices
+    choice_lower = 1
+
+      for asset_index in 1:prim.a_size
+        a = prim.a_vals[asset_index]
+
+        max_value = -Inf # initialize value for (a,s) combinations
+
+          for choice_index in choice_lower:prim.a_size
             aprime = prim.a_vals[choice_index]
             c = s + a - prim.q*aprime
             if c > 0
@@ -121,6 +127,7 @@ function bellman_operator!(prim::Primitives, v::Array{Float64,2})
               if value > max_value
                 max_value = value
                 sigma[asset_index,state_index] = choice_index
+                choice_lower = choice_index
               end
             end
           end

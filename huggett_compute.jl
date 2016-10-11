@@ -7,7 +7,7 @@ using PyPlot
 include("huggett_new.jl")
 
 function compute_huggett(;q0=0.9,max_iter=100,
-  max_iter_vfi=2000,epsilon=1e-3,a_size=500)
+  max_iter_vfi=2000,epsilon=1e-2,a_size=500)
 
   #= Instantiate primitives of model with a starting range for
   discount bond price=#
@@ -66,19 +66,21 @@ function compute_huggett(;q0=0.9,max_iter=100,
 
   end
 
-net_assets, q, results
+net_assets, q, prim, results
 
 end
 
 tic()
-huggett_results = compute_huggett(q0=0.9,max_iter=500,a_size=1000)
+results = compute_huggett(q0=0.9932,max_iter=100,a_size=1000)
 toc()
 
-huggett = results[6]
-huggettres = results[7]
+huggett = results[3]
+huggett_results = results[4]
 
-policy_emp = huggett.a_vals[huggettres.sigma[1:huggett.a_size]]
-policy_unemp = huggett.a_vals[huggettres.sigma[huggett.a_size+1:huggett.N]]
+policy_emp = huggett.a_vals[huggett_results.sigma[:,1]]
+policy_unemp = huggett.a_vals[huggett_results.sigma[:,2]]
+value_emp = huggett_results.Tv[:,1]
+value_unemp = huggett_results.Tv[:,2]
 
 # Plot policy function
 
@@ -93,5 +95,26 @@ title("Policy Functions")
 ax = PyPlot.gca()
 ax[:set_ylim]((-2,5))
 savefig("C:/Users/j0el/Documents/Wisconsin/899/Problem Sets/Week 3/Pictures/policyfunctions.pgf")
+
+# Plot value function
+
+valfig = figure()
+plot(huggett.a_vals,value_emp,color="blue",linewidth=2.0,label="Employed")
+plot(huggett.a_vals,value_unemp,color="red",linewidth=2.0,label="Unemployed")
+xlabel("a")
+ylabel("V(a,s)")
+legend(loc="lower right")
+title("Value Functions")
+ax = PyPlot.gca()
+ax[:set_ylim]((-10,5))
+savefig("C:/Users/j0el/Documents/Wisconsin/899/Problem Sets/Week 3/Pictures/valuefunctions.pgf")
+
+
+# Plot stationary distribution
+
+distfig = figure()
+bar(huggett.a_vals,huggett_results.statdist[1:huggett.a_size])
+bar(huggett.a_vals,huggett_results.statdist[huggett.a_size:huggett.N])
+savefig("C:/Users/j0el/Documents/Wisconsin/899/Problem Sets/Week 3/Pictures/stationarydistributions.pgf")
 
 # Plot Lorenz Curve
