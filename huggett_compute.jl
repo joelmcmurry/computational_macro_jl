@@ -9,29 +9,29 @@ include("huggett_new.jl")
 function compute_huggett(;q0=0.9,max_iter=100,
   max_iter_vfi=2000,epsilon=1e-2,a_size=500)
 
-  #= Instantiate Huggett model with a starting guess for
-  discount bond price and an initialized net_asset level.
-  We will want to keep track of the price last period 'pmin1'
-  for the convergence process=#
+  #= Instantiate primitives of model with a starting guess for
+  discount bond price. We will want to keep track of the price
+  last period 'pmin1' for the convergence process=#
 
   q = q0
   qmin1 = 1
-  net_assets = 10.0
 
-  huggett = Huggett(q=q,a_size=a_size)
+  prim = Primitives(q=q,a_size=a_size)
 
-  ## Create Dynamic Program
+  ## Solve dynamic program given initial q
 
-  huggettdp = DiscreteProgram(huggett.R,huggett.Q,huggett.beta)
-
-  ## Solve Dynamic Program given initial q
-
-  huggettres = SolveProgram(huggettdp,max_iter_vfi=max_iter_vfi)
+  results = SolveProgram(prim,max_iter_vfi=max_iter_vfi)
 
   ## Calculate net asset holdings for initial q
 
-  net_assets = dot(huggett.a_vals[huggettres.sigma],
-    huggettres.statdist)
+  net_assets = 0
+
+  for state in 1:N
+    holdings = results.statdist[state]*
+    prim.a_vals[results.sigma[prim.a_s_indices[state,1],
+    prim.a_s_indices[state,2]]] #asset choice times density at that state
+    net_assets += holdings
+  end
 
   # Print initial net assets and discount bond price
   println("Iter: ", 0, " Net Assets: ", net_assets," q: ", q)
@@ -43,7 +43,7 @@ function compute_huggett(;q0=0.9,max_iter=100,
         break
     elseif net_assets > 0 # q too small
       if q > qmin1
-        qprime = q + abs(q - qmin1)/2
+        qprime = q + abs(q - qmin1)
       else
         qprime = (q + qmin1)/2
       end
@@ -51,44 +51,40 @@ function compute_huggett(;q0=0.9,max_iter=100,
       if q > qmin1
         qprime = (q + qmin1)/2
       else
-        qprime = q - abs(q - qmin1)/2
+        qprime = q - abs(q - qmin1)
       end
     end
     qmin1 = q
     q = qprime
 
-    # Re-initialize current return matrix
-    huggett.R = fill(-Inf,huggett.N,a_size)
-
-    # Update current return matrix given new q
-    curr_return!(huggett,q)
-
-    # Replace current return matrix in dynamic program
-    huggettdp.R = huggett.R
+    # Update primitives given new q
+    prim.q = q
 
     # Solve dynamic program given new q
-    huggettres = SolveProgram(huggettdp,max_iter_vfi=max_iter_vfi)
+    results = SolveProgram(prim,max_iter_vfi=max_iter_vfi)
 
-    # Calculate net asset holdings using stationary distribution
-    net_assets = dot(huggett.a_vals[huggettres.sigma],
-      huggettres.statdist)
+    # Calculate net assets given new q
+
+    net_assets = 0
+
+    for state in 1:N
+      holdings = results.statdist[state]*
+      prim.a_vals[results.sigma[prim.a_s_indices[state,1],
+      prim.a_s_indices[state,2]]] #asset choice times density at that state
+      net_assets += holdings
+    end
 
     # Print iteration, net assets, and discount bond price
     println("Iter: ", i, " Net Assets: ", net_assets," q: ", q)
 
   end
 
-out_value = huggettres.Tv
-out_policy = huggettres.sigma
-out_statdist = huggettres.statdist
-out_assethold = huggett.a_vals[huggettres.sigma]
-
-return net_assets, q, out_value, out_policy, out_statdist, huggett, huggettres
+return net_assets, q, results
 
 end
 
 tic()
-results = compute_huggett(max_iter=100,a_size=100,q0=0.9)
+huggett_results = compute_huggett(q0=0.8)
 toc()
 
 huggett = results[6]
