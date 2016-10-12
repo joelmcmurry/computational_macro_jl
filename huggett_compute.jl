@@ -94,7 +94,7 @@ legend(loc="lower right")
 title("Policy Functions")
 ax = PyPlot.gca()
 ax[:set_ylim]((-2,5))
-savefig("C:/Users/j0el/Documents/Wisconsin/899/Problem Sets/Week 3/Pictures/policyfunctions.pgf")
+savefig("C:/Users/j0el/Documents/Wisconsin/899/Problem Sets/PS4/Pictures/policyfunctions.pgf")
 
 # Plot value function
 
@@ -107,7 +107,7 @@ legend(loc="lower right")
 title("Value Functions")
 ax = PyPlot.gca()
 ax[:set_ylim]((-10,5))
-savefig("C:/Users/j0el/Documents/Wisconsin/899/Problem Sets/Week 3/Pictures/valuefunctions.pgf")
+savefig("C:/Users/j0el/Documents/Wisconsin/899/Problem Sets/PS4/Pictures/valuefunctions.pgf")
 
 
 # Plot stationary distribution
@@ -119,15 +119,53 @@ bar(huggett.a_vals,huggett_results.statdist[huggett.a_size+1:huggett.N],
   color="red",label="Unemployed")
 title("Wealth Distribution")
 legend(loc="upper right")
-savefig("C:/Users/j0el/Documents/Wisconsin/899/Problem Sets/Week 3/Pictures/stationarydistributions.pgf")
+savefig("C:/Users/j0el/Documents/Wisconsin/899/Problem Sets/PS4/Pictures/stationarydistributions.pgf")
 
-# Plot Lorenz Curve
+## Plot Lorenz Curve
 
+# Define wealth as assets plus earnings
 wealth_vals = huggett.a_s_vals[:,1]+huggett.a_s_vals[:,2]
 wealth_held = wealth_vals .* huggett_results.statdist
-test = collect(wealth_held, wealth_vals)
 
-sort then use cumsum and multiply by total to get percentages
+# Create matrix with wealth holdings density matched to the wealth value
+wealth_mat = zeros(huggett.N,2)
+for i in 1:huggett.N
+  wealth_mat[i,1] = wealth_held[i]
+  wealth_mat[i,2] = wealth_vals[i]
+end
+
+# Sort from poorest to richest
+wealth_mat_sort = sortrows(wealth_mat,by=x->x[2])
+
+# Calculate cumulative wealth holdings as percentage of total
+perc_wealth = cumsum(wealth_mat_sort,1)*1/sum(wealth_held)
+
+# Create matrix with agent density matched to the wealth value
+dist_mat = zeros(huggett.N,2)
+for i in 1:huggett.N
+  dist_mat[i,1] = huggett_results.statdist[i]
+  dist_mat[i,2] = wealth_vals[i]
+end
+
+# Sort from poorest to richest
+dist_mat_sort = sortrows(dist_mat,by=x->x[2])
+
+# Calculate cumulative fraction of agents
+perc_agents = cumsum(dist_mat_sort,1)
+
+lorenzfig = figure()
+plot(perc_agents[:,1],perc_wealth[:,1],color="blue",linewidth=2.0)
+plot(perc_agents[:,1],perc_agents[:,1],color="green",linewidth=1.0)
+xlabel("Fraction of Agents")
+ylabel("Fraction of Wealth")
+title("Lorenz Curve")
+ax = PyPlot.gca()
+ax[:set_ylim]((-0.06,1))
+savefig("C:/Users/j0el/Documents/Wisconsin/899/Problem Sets/PS4/Pictures/lorenzcurve.pgf")
+
+# Calculate Gini index
+
+
 
 ## Calculate Consumption Equivalent
 
