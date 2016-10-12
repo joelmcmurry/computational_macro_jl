@@ -113,8 +113,22 @@ savefig("C:/Users/j0el/Documents/Wisconsin/899/Problem Sets/Week 3/Pictures/valu
 # Plot stationary distribution
 
 distfig = figure()
-bar(huggett.a_vals,huggett_results.statdist[1:huggett.a_size])
-bar(huggett.a_vals,huggett_results.statdist[huggett.a_size:huggett.N])
+bar(huggett.a_vals,huggett_results.statdist[1:huggett.a_size],
+  color="blue",label="Employed")
+bar(huggett.a_vals,huggett_results.statdist[huggett.a_size+1:huggett.N],
+  color="red",label="Unemployed")
+title("Wealth Distribution")
+legend(loc="upper right")
 savefig("C:/Users/j0el/Documents/Wisconsin/899/Problem Sets/Week 3/Pictures/stationarydistributions.pgf")
 
 # Plot Lorenz Curve
+
+wealth_vals = huggett.a_s_vals[:,1]+huggett.a_s_vals[:,2]
+wealth_held = wealth_vals .* huggett_results.statdist
+test = collect(wealth_held, wealth_vals)
+
+sort then use cumsum and multiply by total to get percentages
+
+## Calculate Consumption Equivalent
+
+# Plot Consumption Equivalent
