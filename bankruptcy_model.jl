@@ -34,7 +34,8 @@ end
 function Primitives(;beta::Float64=0.8, alpha::Float64=1.5,
   r::Float64=0.04, q_pool::Float64=0.9, rho::Float64=0.9,
   a_min_pool::Float64=-0.525, a_min::Float64=-2.0, a_max::Float64=5.0,
-  a_size::Int64=100, markov=[0.75 (1-0.75);0.75 (1-0.75)], s_vals = [1, 0.05])
+  a_size::Int64=100, markov=[0.75 (1-0.75);0.75 (1-0.75)],
+  s_vals = [1, 0.05])
 
   # Grids
 
@@ -60,7 +61,6 @@ end
 type Results
     v0::Array{Float64,2} # value function for no-bankrupt history
     v1::Array{Float64,2} # value function for bankrupt history
-    v::Array{Float64,2} #
     Tv0::Array{Float64,2} # Bellman return for no-bankrupt history
     Tv1::Array{Float64,2} # Bellman return bankrupt history
     num_iter::Int
@@ -94,22 +94,23 @@ end
 ## Solve Discrete Dynamic Program
 
 # Without initial value function (will be initialized at zeros)
-function SolveProgram(prim::Primitives;
+function SolveProgram(prim::Primitives, bellman_clean::Function;
   max_iter_vfi::Integer=2000, epsilon_vfi::Real=1e-3,
   max_iter_statdist::Integer=500, epsilon_statdist::Real=1e-3)
     res = Results(prim)
-    vfi!(prim, res, max_iter_vfi, epsilon_vfi)
-    create_statdist!(prim, res, max_iter_statdist, epsilon_statdist)
+    vfi!(prim, res, max_iter_vfi, epsilon_vfi,bellman_clean)
+    #create_statdist!(prim, res, max_iter_statdist, epsilon_statdist)
     res
 end
 
 # With Initial value functions v0, v1
 function SolveProgram(prim::Primitives, v0::Array{Float64,2},
-  v0::Array{Float64,2}; max_iter_vfi::Integer=2000, epsilon_vfi::Real=1e-3,
+  v1::Array{Float64,2}, bellman_clean::Function;
+  max_iter_vfi::Integer=2000, epsilon_vfi::Real=1e-3,
   max_iter_statdist::Integer=500, epsilon_statdist::Real=1e-3)
     res = Results(prim, v0, v1)
-    vfi!(prim, res, max_iter_vfi, epsilon_vfi)
-    create_statdist!(prim, res, max_iter_statdist, epsilon_statdist)
+    vfi!(prim, res, max_iter_vfi, epsilon_vfi, bellman_clean)
+    #create_statdist!(prim, res, max_iter_statdist, epsilon_statdist)
     res
 end
 
@@ -293,7 +294,7 @@ end
 ## Value Function Iteration
 
 function vfi!(prim::Primitives, res::Results,
-  max_iter::Integer, epsilon::Real, bellman::Function)
+  max_iter::Integer, epsilon::Real, bellman_clean::Function)
     if prim.beta == 0.0
         tol = Inf
     else
@@ -301,12 +302,18 @@ function vfi!(prim::Primitives, res::Results,
     end
 
     for i in 1:max_iter
-        # updates Tv and sigma in place
-        res.Tv, res.sigma = bellman(prim,res.v0,res.v1)
+        # Calculate
+
+        # update Tv, sigma and replace in results
+        res.Tv1, res.sigma1 = bellman_defaulted!(prim,res.v0,res.v1)
+        res.Tv0, res.sigma0, res.d0 = bellman_clean(prim,res.v0,res.v1)
 
         # compute error and update the value with Tv inside results
-        err = maxabs(res.Tv .- res.v)
-        copy!(res.v, res.Tv)
+        err0 = maxabs(res.Tv0 .- res.v0)
+        err1 = maxabs(res.Tv1 .- res.v1)
+        copy!(res.v0, res.Tv0)
+        copy!(res.v1, res.Tv1)
+        err = max(err0,err1)
         res.num_iter += 1
 
         if err < tol
@@ -315,4 +322,58 @@ function vfi!(prim::Primitives, res::Results,
     end
 
     res
+end
+
+## Find Stationary distribution
+
+function create_statdist!(prim::Primitives, res::Results,
+  max_iter::Integer, epsilon::Real)
+
+N = prim.N
+m = prim.a_size
+
+#= Create transition matrix Tstar that is N x N, where N is the number
+of (a,s) combinations. Each row of Tstar is a conditional distribution over
+(a',s') conditional on the (a,s) today defined by row index =#
+
+Tstar = spzeros(N,N)
+
+for state_today in 1:N
+  choice_index = res.sigma[prim.a_s_indices[state_today,1],
+  prim.a_s_indices[state_today,2]] #a' given (a,s)
+  for state_tomorrow in 1:N
+    if prim.a_s_indices[state_tomorrow,1] == choice_index
+      Tstar[state_today,state_tomorrow] =
+        prim.markov[prim.a_s_indices[state_today,2]
+        ,prim.a_s_indices[state_tomorrow,2]]
+    end
+  end
+end
+
+#= Find stationary distribution. Start with any distribution over
+states and feed through Tstar matrix until convergence=#
+
+statdist = res.statdist
+
+num_iter = 0
+
+  for i in 1:max_iter
+
+      statdistprime = Tstar'*statdist
+
+      # compute error and update stationary distribution
+      err = maxabs(statdistprime .- statdist)
+      copy!(statdist, statdistprime)
+      num_iter += 1
+
+      if err < epsilon
+          break
+      end
+  end
+
+  res.statdist = statdist
+  res.num_dist = num_iter
+
+  res
+
 end
