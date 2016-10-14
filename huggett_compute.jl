@@ -1,5 +1,6 @@
 #=
 Program Name: huggett_compute.jl
+Runs Huggett model
 =#
 
 using PyPlot
@@ -165,8 +166,65 @@ savefig("C:/Users/j0el/Documents/Wisconsin/899/Problem Sets/PS4/Pictures/lorenzc
 
 # Calculate Gini index
 
+# Approximate integral under Lorenz curve with Riemann sums
+gini_rect = zeros(huggett.N)
+for i in 1:huggett.N-1
+  gini_rect[i] = (perc_agents[i,1]-perc_wealth[i,1])*
+    (perc_agents[i+1,1]-perc_agents[i,1])
+end
 
+gini_index = (0.5-sum(gini_rect))/0.5
 
 ## Calculate Consumption Equivalent
 
+# Find stationary distribution of Markov transition matrix
+
+function findstatmeasure(markov::Array{Float64,2},epsilon::Real)
+  p0 = [0.5 1-0.5]
+  p1 = p0
+  diff = 1
+  while diff > epsilon
+    p1 = p0*markov
+    diff = maxabs(p1 .- p0)
+    p0=p1
+  end
+  return p1
+end
+
+statmeasure = findstatmeasure(huggett.markov,1e-6)
+
+# Calculate welfare with complete markets
+consfb = statmeasure[1]*1+statmeasure[2]*0.5
+Wfb = (1/(1-huggett.beta))*(1/(1-huggett.alpha))*(1/(consfb^(huggett.alpha-1))-1)
+
+# Calculate welfare with incomplete markets
+Winc = dot(huggett_results.statdist[1:huggett.a_size],huggett_results.Tv[:,1])+
+  dot(huggett_results.statdist[huggett.a_size+1:huggett.N],huggett_results.Tv[:,2])
+
+# Calculate consumption equivalent
+lambda = ((Wfb+(1/((1-huggett.alpha)*(1-huggett.beta))))^(1/(1-huggett.alpha)))*
+  ((huggett_results.Tv .+ (1/((1-huggett.alpha)*(1-huggett.beta)))).^(1/(huggett.alpha-1))).-1
+
+lambda_emp = lambda[:,1]
+lambda_unemp = lambda[:,2]
+
+# Calculate welfare gain
+WG = dot(huggett_results.statdist[1:huggett.a_size],lambda_emp)+
+  dot(huggett_results.statdist[huggett.a_size+1:huggett.N],lambda_unemp)
+
+# Calculate fraction of population in favor of switching to complete markets
+
+frac_switch = dot(lambda_emp.>=0,huggett_results.statdist[1:huggett.a_size])+
+  dot(lambda_unemp.>=0,huggett_results.statdist[huggett.a_size+1:huggett.N])
+
 # Plot Consumption Equivalent
+
+conseqfig = figure()
+plot(huggett.a_vals,lambda[:,1],color="blue",linewidth=2.0,label="Employed")
+plot(huggett.a_vals,lambda[:,2],color="red",linewidth=2.0,label="Unemployed")
+xlabel("a")
+ylabel("lambda(a,s)")
+legend(loc="lower right")
+title("Consumption Equivalents")
+ax = PyPlot.gca()
+savefig("C:/Users/j0el/Documents/Wisconsin/899/Problem Sets/PS4/Pictures/consequiv.pgf")

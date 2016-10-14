@@ -1,4 +1,7 @@
-#=Huggett Model and Utilities=#
+#=
+Program Name: huggett_model.jl
+Creates Huggett Model and Utilities
+=#
 
 using QuantEcon: gridmake
 
