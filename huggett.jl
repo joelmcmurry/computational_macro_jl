@@ -13,7 +13,7 @@ type Huggett
   alpha :: Float64 ## risk aversion
   q :: Float64 ## interest rate
   R :: Array{Float64} ## current return matrix
-  Q :: Array{Float64} ## transition matrix (3 dimensional)
+  Q :: SparseMatrixCSC{Float64} ## transition matrix (3 dimensional)
   a_min :: Float64 ## minimum asset value
   a_max :: Float64 ## maximum asset value
   a_size :: Int64 ## size of asset grid
@@ -49,7 +49,7 @@ function Huggett(;beta::Float64=0.9932, alpha::Float64=1.5,
   point gives us the distribution over the N states (a',s') conditional on
   being in state (a,s) (length index) and choosing a' (width index)=#
 
-  Q = zeros(Float64, N, a_size, N)
+  Q = spzeros(Float64, N, a_size, N)
   for stateprime_index in 1:N
       for choice_index in 1:a_size
           for state_index in 1:N

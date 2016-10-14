@@ -8,30 +8,16 @@ available at QuantEcon.net
   transition matrix, and discount factor. Object is this triple
   after error checking =#
 
+#this be some crazy shit
+
 type DiscreteProgram{T<:Real,NQ,NR,Tbeta<:Real}
   R::Array{T,NR} ## current return matrix
-  Q::Array{T,NQ} ## transition matrix (3 dimensional)
+  Q::SparseMatrixCSC{T,NQ} ## transition matrix (3 dimensional)
   beta::Tbeta ## discount factor
 
     function DiscreteProgram(R::Array, Q::Array, beta::Real)
-        # verify input integrity 1
-        if NQ != 3
-            msg = "Q must be 3-dimensional without state-action formulation"
-            throw(ArgumentError(msg))
-        end
-        if NR != 2
-            msg = "R must be 2-dimensional without state-action formulation"
-            throw(ArgumentError(msg))
-        end
-        (beta < 0 || beta >= 1) &&  throw(ArgumentError("beta must be [0, 1)"))
 
-        # verify input integrity 2
-        num_states, num_actions = size(R)
-        if size(Q) != (num_states, num_actions, num_states)
-            throw(ArgumentError("shapes of R and Q must be (N,M) and (N,M,N)"))
-        end
-
-        # check feasibility
+        # check feasibility of current returns
         R_max = vec(maximum(R,2))
         if any(R_max .== -Inf)
             # First state index such that all actions yield -Inf
@@ -50,7 +36,7 @@ DiscreteProgram{T,NQ,NR,Tbeta} and not the general DiscreteProgram.
 Outer constructor defines method for general DiscreteProgram (which
 only applies to inputs with the proper types). =#
 
-DiscreteProgram{T,NQ,NR,Tbeta}(R::Array{T,NR}, Q::Array{T,NQ},
+DiscreteProgram{T,NQ,NR,Tbeta}(R::Array{T,NR}, Q::SparseMatrixCSC{T,NQ},
   beta::Tbeta) = DiscreteProgram{T,NQ,NR,Tbeta}(R, Q, beta)
 
 ## Type DPResult which holds results of the problem
@@ -78,7 +64,7 @@ end
 
 function SolveProgram{T}(ddp::DiscreteProgram{T};
   max_iter_vfi::Integer=250, epsilon_vfi::Real=1e-3,
-  max_iter_statdist::Integer=250, epsilon_statdist::Real=1e-3)
+  max_iter_statdist::Integer=250, epsilon_statdist::Real=1e-5)
     ddpr = DPResult{T}(ddp)
     vfi!(ddp, ddpr, max_iter_vfi, epsilon_vfi)
     create_statdist!(ddp, ddpr, max_iter_statdist, epsilon_statdist)
@@ -97,6 +83,24 @@ function bellman_operator!(ddp::DiscreteProgram, v::Vector,
     vals = ddp.R + ddp.beta * (ddp.Q * v)
     rowwise_max!(vals, Tv, sigma)
     Tv, sigma
+end
+
+function bellman_operator!(ddp::DiscreteProgram, v::Vector,
+  Tv::Vector, sigma::Vector)
+  # initialize
+  value = inf or something
+  # find max
+  for i in 1:states
+      for j in 1:choices
+        if R[i,j] > 0
+          value = R[i,j] + beta*(markov )
+          if value > max_value
+            max_value = value
+          end
+        end
+
+      end
+  end
 end
 
 #= Simplify input, telling the function to output Tv and sigma
@@ -225,7 +229,7 @@ action =#
 
 import Base.*
 
-function *{T}(A::Array{T,3}, v::Vector)
+function *{T}(A::SparseMatrixCSC{T,3}, v::Vector)
   shape = size(A)
   size(v,1) == shape[end] || error("wrong dimensions")
 
