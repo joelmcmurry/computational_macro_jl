@@ -69,13 +69,15 @@ type Results
     sigma0::Array{Int,2} # asset policy function for no-bankrupt history
     sigma1::Array{Int,2} # asset policy function for bankrupt history
     d0::Array{Int,2} # default policy function (discrete choice)
-    statdist::Array{Float64}
+    statdist0::Array{Float64} # stationary dist for no-bankrupt history
+    statdist1::Array{Float64} # stationary dist for bankrupt history
     num_dist::Int
 
     function Results(prim::Primitives)
         v0 = zeros(prim.a_size,prim.s_size) # Initialise value with zeroes
         v1 = zeros(prim.a_size,prim.s_size)
-        statdist = ones(prim.N)*(1/prim.N)# Initialize stationary distribution with uniform
+        statdist0 = ones(prim.N)*(1/prim.N) # Initialize stationary distribution with uniform
+        statdist1 = ones(prim.N)*(1/prim.N)
         res = new(v0, v1, similar(v0), similar(v1), 0, similar(v0, Int),
         similar(v1,Int), similar(v0,Int), statdist, 0)
 
@@ -85,7 +87,8 @@ type Results
     # Version w/ initial v0, v1
     function Results(prim::Primitives,v0::Array{Float64,2},
       v1::Array{Float64,2})
-        statdist = ones(prim.N)*(1/prim.N)# Initialize stationary distribution with uniform
+        statdist0 = ones(prim.N)*(1/prim.N) # Initialize stationary distribution with uniform
+        statdist1 = ones(prim.N)*(1/prim.N)
         res = new(v0, v1, similar(v0), similar(v1), 0, similar(v0, Int),
         similar(v1,Int), similar(v0,Int), statdist, 0)
 
