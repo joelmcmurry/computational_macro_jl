@@ -82,7 +82,8 @@ type Results
     function Results(prim::Primitives)
         v0 = zeros(prim.a_size,prim.s_size) # Initialise value with zeroes
         v1 = zeros(prim.a_size,prim.s_size)
-        statdist = ones(2*prim.N)*(1/(2*prim.N)) # Initialize stationary distribution with uniform
+        # Initialize stationary distribution with uniform over no-bankruptcy
+        statdist = vcat(ones(prim.N),zeros(prim.N))*(1/prim.N)
         res = new(v0, v1, similar(v0), similar(v1), 0, similar(v0, Int),
         similar(v1,Int), similar(v0,Int), statdist, 0)
 
@@ -92,7 +93,8 @@ type Results
     # Version w/ initial v0, v1
     function Results(prim::Primitives,v0::Array{Float64,2},
       v1::Array{Float64,2})
-        statdist = ones(prim.N)*(1/prim.N) # Initialize stationary distribution with uniform
+        # Initialize stationary distribution with uniform over no-bankruptcy
+        statdist = vcat(ones(prim.N),zeros(prim.N))*(1/prim.N)
         res = new(v0, v1, similar(v0), similar(v1), 0, similar(v0, Int),
         similar(v1,Int), similar(v0,Int), statdist, 0)
 
@@ -377,7 +379,6 @@ function create_statdist!(prim::Primitives, res::Results,
 
 N = prim.N
 Nover2 = convert(Int64,N/2)
-m = prim.a_size
 
 ## Transition Matrix
 
@@ -410,7 +411,7 @@ for state_hist_today in 1:2*N
       end
     else #= if agent defaults, mass distributed to zero
       with a bankrupt history (split between employment states
-      tomorrow)=#
+      tomorrow) =#
       zero_tomorrow_high = N+prim.zero_index
       zero_tomorrow_low = N+Nover2+prim.zero_index
       Tstar[state_hist_today,zero_tomorrow_high] =
@@ -422,7 +423,7 @@ for state_hist_today in 1:2*N
   lookup_state_today = state_hist_today-N # back out (a,s) combination index
   choice_index = res.sigma1[prim.a_s_indices[lookup_state_today,1],
   prim.a_s_indices[lookup_state_today,2]] # a' given (a,s)
-  #= agents cannot default, but need to pass over (a,s) where a < 0 =#
+  #= agents cannot default and cannot have a < 0 =#
     if choice_index != 0
       #= agents end up in no-bankrupt history with probability (1-rho)=#
       for state_hist_tomorrow in 1:N

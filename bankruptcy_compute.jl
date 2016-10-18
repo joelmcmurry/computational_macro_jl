@@ -1,38 +1,49 @@
 #=
-Program Name: huggett_compute.jl
-Runs Huggett model
+Program Name: bankruptcy_compute.jl
+Runs bankruptcy model
 =#
 
 using PyPlot
 
-include("huggett_model.jl")
+include("bankruptcy_model.jl")
 
-function compute_huggett(;q0=0.9,max_iter=100,
+function compute_pooling(;q0=0.9,max_iter=100,
   max_iter_vfi=2000,epsilon=1e-2,a_size=500)
 
-  ## Starting range for discount bond price
+  ## Starting range for pooling discount bond price
 
   qlower = q0
   qupper = 1
 
-  q = (qlower + qupper)/2
+  q_pool = (qlower + qupper)/2
 
   # Initialize primitives
-  prim = Primitives(q=q,a_size=a_size)
+  prim = Primitives(q_pool=q_pool,a_size=a_size)
 
-  # Initial guess for value function
-  v = zeros(prim.a_size,prim.s_size)
+  # Initial guess for value functions
+  v0 = zeros(prim.a_size,prim.s_size)
+  v1 = zeros(prim.a_size,prim.s_size)
 
-  # Initialize net assets
-  net_assets::Float64 = 10.0
+  # Initialize lender profits
+  profits_pool::Float64 = 10.0
 
   # Initialize results structure
-  results = Results(prim)
+  results = Results(prim,v0,v1)
 
   for i in 1:max_iter
 
     # Solve dynamic program given new q
-    results = SolveProgram(prim,v,max_iter_vfi=max_iter_vfi)
+    results = SolveProgram(prim,v0,v1,max_iter_vfi=max_iter_vfi)
+
+    
+
+
+
+
+
+
+
+
 
     # Calculate net assets given new q
     net_assets = 0
