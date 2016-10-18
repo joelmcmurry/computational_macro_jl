@@ -32,55 +32,48 @@ function compute_pooling(;q0=0.9,max_iter=100,
 
   for i in 1:max_iter
 
-    # Solve dynamic program given new q
+    # Solve dynamic program given new q_pool
     results = SolveProgram(prim,v0,v1,max_iter_vfi=max_iter_vfi)
 
-    
+    ## Calculate loss rate for lenders
+      # Total assets length
+      L =
 
+      # Total defaulted assets
+      D =
 
+      # Loss rate
+      Deltaprime = D/L
 
-
-
-
-
-
-
-    # Calculate net assets given new q
-    net_assets = 0
-
-    for state in 1:prim.N
-      holdings = results.statdist[state]*
-      prim.a_vals[results.sigma[prim.a_s_indices[state,1],
-      prim.a_s_indices[state,2]]] #asset choice times density at that state
-      net_assets += holdings
-    end
+      profits_pool = q_pool - (1 - Deltaprime)/(1 + prim.r)
 
     # Print iteration, net assets, and discount bond price
-    println("Iter: ", i, " Net Assets: ", net_assets," q: ", q)
+    println("Iter: ", i, " Profits: ", profits_pool," q_pool: ", q_pool)
 
     # Adjust q (and stop if asset market clears)
-    if abs(net_assets) < epsilon
+    if abs(profits_pool) < epsilon
         break
-    elseif net_assets > 0 # q too small
-      qlower = q
-    else # q too big
-      qupper = q
+    elseif profits_pool > 0 # q too smallFIGURE THIS OUT
+      qlower = q_pool
+    else # q too big FIGURE THIS OUT
+      qupper = q_pool
     end
 
-    q = (qlower + qupper)/2
+    q_pool = (qlower + qupper)/2
 
     # Update primitives given new q
-    prim.q = q
+    prim.q_pool = q_pool
 
     # Update guess for value function
-    v = results.Tv
+    v0 = results.Tv0
+    v1 = results.Tv1
 
   end
 
-net_assets, q, prim, results
+profits_pool, q_pool, prim, results
 
 end
-
+#######################################
 tic()
 results = compute_huggett(q0=0.9932,max_iter=100,a_size=2000)
 toc()
