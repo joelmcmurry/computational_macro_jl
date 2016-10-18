@@ -69,15 +69,13 @@ type Results
     sigma0::Array{Int,2} # asset policy function for no-bankrupt history
     sigma1::Array{Int,2} # asset policy function for bankrupt history
     d0::Array{Int,2} # default policy function (discrete choice)
-    statdist0::Array{Float64} # stationary dist for no-bankrupt history
-    statdist1::Array{Float64} # stationary dist for bankrupt history
+    statdist::Array{Float64} # stationary distribution
     num_dist::Int
 
     function Results(prim::Primitives)
         v0 = zeros(prim.a_size,prim.s_size) # Initialise value with zeroes
         v1 = zeros(prim.a_size,prim.s_size)
-        statdist0 = ones(prim.N)*(1/prim.N) # Initialize stationary distribution with uniform
-        statdist1 = ones(prim.N)*(1/prim.N)
+        statdist = ones(2*prim.N)*(1/(2*prim.N)) # Initialize stationary distribution with uniform
         res = new(v0, v1, similar(v0), similar(v1), 0, similar(v0, Int),
         similar(v1,Int), similar(v0,Int), statdist, 0)
 
@@ -87,8 +85,7 @@ type Results
     # Version w/ initial v0, v1
     function Results(prim::Primitives,v0::Array{Float64,2},
       v1::Array{Float64,2})
-        statdist0 = ones(prim.N)*(1/prim.N) # Initialize stationary distribution with uniform
-        statdist1 = ones(prim.N)*(1/prim.N)
+        statdist = ones(prim.N)*(1/prim.N) # Initialize stationary distribution with uniform
         res = new(v0, v1, similar(v0), similar(v1), 0, similar(v0, Int),
         similar(v1,Int), similar(v0,Int), statdist, 0)
 
@@ -374,25 +371,62 @@ function create_statdist!(prim::Primitives, res::Results,
 N = prim.N
 m = prim.a_size
 
-#= Create transition matrix Tstar that is N x N, where N is the number
-of (a,s) combinations. Each row of Tstar is a conditional distribution over
-(a',s') conditional on the (a,s) today defined by row index =#
+## Transition Matrix
 
-Tstar = spzeros(N,N)
+Tstar = spzeros(2*N,2*N)
 
-for state_today in 1:N
-  choice_index = res.sigma[prim.a_s_indices[state_today,1],
-  prim.a_s_indices[state_today,2]] #a' given (a,s)
-  for state_tomorrow in 1:N
-    if prim.a_s_indices[state_tomorrow,1] == choice_index
-      Tstar[state_today,state_tomorrow] =
-        prim.markov[prim.a_s_indices[state_today,2]
-        ,prim.a_s_indices[state_tomorrow,2]]
+#= Here we distinguish between "state/history" which adds
+bankruptcy history as a state variable and "state" which
+is just (a,s) combination matching the primitive indexing =#
+
+#= Distribution will be N states without a bankruptcy history
+and N states with a bankruptcy history =#
+
+for state_hist_today in 1:2*N
+
+  # look in sigma0 if state/history has a no-bankrupt history
+  if state_hist_today <= N
+  lookup_state_today = state_hist_today # back out (a,s) combination index
+  choice_index = res.sigma0[prim.a_s_indices[lookup_state_today,1],
+  prim.a_s_indices[lookup_state_today,2]] # a' given (a,s)
+  #= if agent doesn't default, restrict state/history tomorrow
+  to no-bankrupt states/histories =#
+    if choice_index != 0
+      for state_hist_tomorrow in 1:N
+        lookup_state_tomorrow = state_hist_tomorrow
+        if prim.a_s_indices[lookup_state_tomorrow,1] == choice_index
+          Tstar[state_hist_today,state_hist_tomorrow] =
+            prim.markov[prim.a_s_indices[lookup_state_today,2]
+            ,prim.a_s_indices[lookup_state_tomorrow,2]]
+        end
+      end
+    else # if agent defaults, mass is on zero with a bankrupt history
+      state_history_tomorrow = N+zero_index
+      Tstar[state_hist_today,state_history_tomorrow] =  1
+    end
+  else # look in sigma1 if state/history has a bankrupt history
+  lookup_state_today = state_hist_today-N # back out (a,s) combination index
+  choice_index = res.sigma1[prim.a_s_indices[lookup_state_today,1],
+  prim.a_s_indices[lookup_state_today,2]] # a' given (a,s)
+  #= if agent doesn't default, restrict state/history tomorrow
+  to no-bankrupt states/histories =#
+    if choice_index != 0
+      for state_hist_tomorrow in N+1:2*N
+        lookup_state_tomorrow = state_hist_tomorrow-N
+        if prim.a_s_indices[lookup_state_tomorrow,1] == choice_index
+          Tstar[state_hist_today,state_hist_tomorrow] =
+            prim.markov[prim.a_s_indices[lookup_state_today,2]
+            ,prim.a_s_indices[lookup_state_tomorrow,2]]
+        end
+      end
+    else # if agent defaults, mass is on zero with a bankrupt history
+      state_history_tomorrow = N+zero_index
+      Tstar[state_hist_today,state_history_tomorrow] =  0
     end
   end
 end
 
-#= Find stationary distribution. Start with any distribution over
+#= Find stationary distributions. Start with any distribution over
 states and feed through Tstar matrix until convergence=#
 
 statdist = res.statdist
