@@ -35,8 +35,15 @@ end
 function Primitives(;beta::Float64=0.8, alpha::Float64=1.5,
   r::Float64=0.04, q_pool::Float64=0.9, rho::Float64=0.9,
   a_min_pool::Float64=-0.525, a_min::Float64=-2.0, a_max::Float64=5.0,
-  a_size::Int64=100, markov=[0.75 (1-0.75);0.75 (1-0.75)],
+  a_size::Int64=100, markov=[0.75 (1-0.75);(1-0.75) 0.75],
   s_vals = [1, 0.05])
+
+  # Asset grize side must be even
+
+  if iseven(a_size) != true
+    msg = "Asset grid size must be an even integer"
+    throw(ArgumentError(msg))
+  end
 
   # Grids
 
@@ -369,6 +376,7 @@ function create_statdist!(prim::Primitives, res::Results,
   max_iter::Integer, epsilon::Real)
 
 N = prim.N
+Nover2 = convert(Int64,N/2)
 m = prim.a_size
 
 ## Transition Matrix
@@ -380,7 +388,7 @@ bankruptcy history as a state variable and "state" which
 is just (a,s) combination matching the primitive indexing =#
 
 #= Distribution will be N states without a bankruptcy history
-and N states with a bankruptcy history =#
+and N states with a bankruptcy history. Total 2N =#
 
 for state_hist_today in 1:2*N
 
@@ -400,28 +408,40 @@ for state_hist_today in 1:2*N
             ,prim.a_s_indices[lookup_state_tomorrow,2]]
         end
       end
-    else # if agent defaults, mass is on zero with a bankrupt history
-      state_history_tomorrow = N+zero_index
-      Tstar[state_hist_today,state_history_tomorrow] =  1
+    else #= if agent defaults, mass distributed to zero
+      with a bankrupt history (split between employment states
+      tomorrow)=#
+      zero_tomorrow_high = N+prim.zero_index
+      zero_tomorrow_low = N+Nover2+prim.zero_index
+      Tstar[state_hist_today,zero_tomorrow_high] =
+        prim.markov[prim.a_s_indices[lookup_state_today,2],1]
+      Tstar[state_hist_today,zero_tomorrow_low] =
+        prim.markov[prim.a_s_indices[lookup_state_today,2],2]
     end
   else # look in sigma1 if state/history has a bankrupt history
   lookup_state_today = state_hist_today-N # back out (a,s) combination index
   choice_index = res.sigma1[prim.a_s_indices[lookup_state_today,1],
   prim.a_s_indices[lookup_state_today,2]] # a' given (a,s)
-  #= if agent doesn't default, restrict state/history tomorrow
-  to no-bankrupt states/histories =#
+  #= agents cannot default, but need to pass over (a,s) where a < 0 =#
     if choice_index != 0
+      #= agents end up in no-bankrupt history with probability (1-rho)=#
+      for state_hist_tomorrow in 1:N
+        lookup_state_tomorrow = state_hist_tomorrow
+        if prim.a_s_indices[lookup_state_tomorrow,1] == choice_index
+          Tstar[state_hist_today,state_hist_tomorrow] =
+            (1-prim.rho)*prim.markov[prim.a_s_indices[lookup_state_today,2]
+            ,prim.a_s_indices[lookup_state_tomorrow,2]]
+        end
+      end
+      #= agents end up in bankrupt history with probability rho=#
       for state_hist_tomorrow in N+1:2*N
         lookup_state_tomorrow = state_hist_tomorrow-N
         if prim.a_s_indices[lookup_state_tomorrow,1] == choice_index
           Tstar[state_hist_today,state_hist_tomorrow] =
-            prim.markov[prim.a_s_indices[lookup_state_today,2]
+            prim.rho*prim.markov[prim.a_s_indices[lookup_state_today,2]
             ,prim.a_s_indices[lookup_state_tomorrow,2]]
         end
       end
-    else # if agent defaults, mass is on zero with a bankrupt history
-      state_history_tomorrow = N+zero_index
-      Tstar[state_hist_today,state_history_tomorrow] =  0
     end
   end
 end
