@@ -110,7 +110,7 @@ function SolveProgram(prim::Primitives, bellman_clean::Function;
   max_iter_statdist::Integer=500, epsilon_statdist::Real=1e-3)
     res = Results(prim)
     vfi!(prim, res, max_iter_vfi, epsilon_vfi,bellman_clean)
-    #create_statdist!(prim, res, max_iter_statdist, epsilon_statdist)
+    create_statdist!(prim, res, max_iter_statdist, epsilon_statdist)
     res
 end
 
@@ -121,7 +121,7 @@ function SolveProgram(prim::Primitives, v0::Array{Float64,2},
   max_iter_statdist::Integer=500, epsilon_statdist::Real=1e-3)
     res = Results(prim, v0, v1)
     vfi!(prim, res, max_iter_vfi, epsilon_vfi, bellman_clean)
-    #create_statdist!(prim, res, max_iter_statdist, epsilon_statdist)
+    create_statdist!(prim, res, max_iter_statdist, epsilon_statdist)
     res
 end
 
