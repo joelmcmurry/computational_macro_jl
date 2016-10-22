@@ -16,7 +16,6 @@ type Primitives
   rho :: Float64 ## legal record keeping tech parameter
   a_min :: Float64 ## minimum asset value
   a_max :: Float64 ## maximum asset value
-  a_min_pool :: Float64 ## pooling contract borrowing constraints
   a_min_sep :: Array{Float64,2} ## separating contract borrowing constraints
   a_size :: Int64 ## size of asset grid
   a_vals :: Vector{Float64} ## asset grid
@@ -34,9 +33,8 @@ end
 
 function Primitives(;beta::Float64=0.8, alpha::Float64=1.5,
   r::Float64=0.04, q_pool::Float64=0.9, rho::Float64=0.9,
-  a_min_pool::Float64=-0.525, a_min::Float64=-2.0, a_max::Float64=5.0,
-  a_size::Int64=100, markov=[0.75 (1-0.75);(1-0.75) 0.75],
-  s_vals = [1, 0.05])
+  a_min::Float64=-0.525, a_max::Float64=5.0, a_size::Int64=100,
+  markov=[0.75 (1-0.75);(1-0.75) 0.75], s_vals = [1, 0.05])
 
   # Asset grize side must be even
 
@@ -47,18 +45,18 @@ function Primitives(;beta::Float64=0.8, alpha::Float64=1.5,
 
   # Grids
 
-  a_vals = union(linspace(a_min, 0, a_size/2),linspace(0, a_max, a_size/2+1))
-  zero_index = convert(Int64,a_size/2)
+  a_vals = sort(union(linspace(a_min,a_max,a_size-1),0))
+  zero_index = find(a_vals.==0)[1]
   s_size = length(markov[1:2,1])
   a_indices = gridmake(1:a_size)
   N = a_size*s_size
   a_s_vals = gridmake(a_vals,s_vals)
   a_s_indices = gridmake(1:a_size,1:s_size)
   q_menu = ones(a_size,2)*q_pool
-  a_min_sep = ones(a_size,2)*a_min_pool
+  a_min_sep = ones(a_size,2)*a_min
 
   primitives = Primitives(beta, alpha, r, q_pool, q_menu, rho, a_min,
-  a_max, a_min_pool, a_min_sep, a_size, a_vals, a_indices, s_size,
+  a_max, a_min_sep, a_size, a_vals, a_indices, s_size,
   s_vals, markov, a_s_vals, a_s_indices, N, zero_index)
 
   return primitives
@@ -107,7 +105,7 @@ end
 # Without initial value function (will be initialized at zeros)
 function SolveProgram(prim::Primitives, bellman_clean::Function;
   max_iter_vfi::Integer=2000, epsilon_vfi::Real=1e-3,
-  max_iter_statdist::Integer=500, epsilon_statdist::Real=1e-3)
+  max_iter_statdist::Integer=500, epsilon_statdist::Real=1e-4)
     res = Results(prim)
     vfi!(prim, res, max_iter_vfi, epsilon_vfi,bellman_clean)
     create_statdist!(prim, res, max_iter_statdist, epsilon_statdist)
@@ -118,7 +116,7 @@ end
 function SolveProgram(prim::Primitives, v0::Array{Float64,2},
   v1::Array{Float64,2}, bellman_clean::Function;
   max_iter_vfi::Integer=2000, epsilon_vfi::Real=1e-3,
-  max_iter_statdist::Integer=500, epsilon_statdist::Real=1e-3)
+  max_iter_statdist::Integer=500, epsilon_statdist::Real=1e-4)
     res = Results(prim, v0, v1)
     vfi!(prim, res, max_iter_vfi, epsilon_vfi, bellman_clean)
     create_statdist!(prim, res, max_iter_statdist, epsilon_statdist)
@@ -151,20 +149,23 @@ function bellman_defaulted!(prim::Primitives, v0::Array{Float64,2},
 
     max_value = -Inf # initialize value for (a,s) combinations
 
-      for choice_index in choice_lower:prim.a_size
-        # check if choice is greater than zero. (no borrowing)
-        if prim.a_vals[choice_index] >= 0
-          aprime = prim.a_vals[choice_index]
-          c = s + a - (1/(1+prim.r))*aprime
-          if c > 0
-            value = (1/(1-prim.alpha))*(1/(c^(prim.alpha-1))-1) +
-            prim.beta*dot(prim.markov[state_index,:],
-            (prim.rho*v1[choice_index,:]+
-            (1-prim.rho)*v0[choice_index,:]))
-            if value > max_value
-              max_value = value
-              sigma1[asset_index,state_index] = choice_index
-              choice_lower = choice_index
+      # Bankrupt history values only defined for positive assets
+      if a >= 0
+        for choice_index in choice_lower:prim.a_size
+          # check if choice is greater than zero. (no borrowing)
+          if prim.a_vals[choice_index] >= 0
+            aprime = prim.a_vals[choice_index]
+            c = s + a - (1/(1+prim.r))*aprime
+            if c > 0
+              value = (1/(1-prim.alpha))*(1/(c^(prim.alpha-1))-1) +
+              prim.beta*dot(prim.markov[state_index,:],
+              (prim.rho*v1[choice_index,:]+
+              (1-prim.rho)*v0[choice_index,:]))
+              if value > max_value
+                max_value = value
+                sigma1[asset_index,state_index] = choice_index
+                choice_lower = choice_index
+              end
             end
           end
         end
@@ -214,34 +215,22 @@ function bellman_clean_pool!(prim::Primitives, v0::Array{Float64,2},
         for choice_index in choice_lower:prim.a_size
           aprime = prim.a_vals[choice_index]
 
-          # check if asset choice is above borrowing constraints
-          if aprime >= prim.a_min_pool
+          # saving and borrowing at different rates
+          if aprime <= 0 # borrow at market raets
+            c = s + a - prim.q_menu[choice_index,state_index]*aprime
+          else # save at risk-free rates
+            c = s + a - (1/(1+prim.r))*aprime
+          end
 
-            # saving and borrow at different rates
-            if aprime <= 0 # borrow at market price
-              c = s + a - prim.q_pool*aprime
-              if c > 0
-                value = (1/(1-prim.alpha))*(1/(c^(prim.alpha-1))-1) +
-                prim.beta*dot(prim.markov[state_index,:],v0[choice_index,:])
-                if value > max_value
-                  max_value = value
-                  sigma0[asset_index,state_index] = choice_index
-                  choice_lower = choice_index
-                end
-              end
-            else # save at risk-free rate
-              c = s + a - (1/(1+prim.r))*aprime
-              if c > 0
-                value = (1/(1-prim.alpha))*(1/(c^(prim.alpha-1))-1) +
-                prim.beta*dot(prim.markov[state_index,:],v0[choice_index,:])
-                if value > max_value
-                  max_value = value
-                  sigma0[asset_index,state_index] = choice_index
-                  choice_lower = choice_index
-                end
-              end
+          if c > 0
+            value = (1/(1-prim.alpha))*(1/(c^(prim.alpha-1))-1) +
+            prim.beta*dot(prim.markov[state_index,:],v0[choice_index,:])
+            if value > max_value
+              max_value = value
+              sigma0[asset_index,state_index] = choice_index
+              choice_lower = choice_index
             end
-          end # borrowing constraint
+          end
         end # asset choice
       Tvnd[asset_index,state_index] = max_value
       #= If defaulting value is higher, then value for that (a,s) is defaulting
@@ -249,7 +238,7 @@ function bellman_clean_pool!(prim::Primitives, v0::Array{Float64,2},
       not defaulting value and decision rule is not to default=#
       if Tvd[asset_index,state_index] > Tvnd[asset_index,state_index]
         d0[asset_index,state_index] = 1
-        sigma0[asset_index,state_index] = 0
+        sigma0[asset_index,state_index] = prim.zero_index
         Tv0[asset_index,state_index] = Tvd[asset_index,state_index]
       else
         Tv0[asset_index,state_index] = Tvnd[asset_index,state_index]
@@ -299,28 +288,20 @@ function bellman_clean_sep!(prim::Primitives, v0::Array{Float64,2},
           # check if asset choice is above borrowing constraints
           if aprime >= prim.a_min_sep[choice_index,state_index]
 
-            # saving and borrow at different rates
-            if aprime <= 0 # borrow at market price
+            # saving and borrowing at different rates
+            if aprime <= 0 # borrow at market raets
               c = s + a - prim.q_menu[choice_index,state_index]*aprime
-              if c > 0
-                value = (1/(1-prim.alpha))*(1/(c^(prim.alpha-1))-1) +
-                prim.beta*dot(prim.markov[state_index,:],v0[choice_index,:])
-                if value > max_value
-                  max_value = value
-                  sigma0[asset_index,state_index] = choice_index
-                  choice_lower = choice_index
-                end
-              end
-            else # save at risk-free rate
+            else # save at risk-free rates
               c = s + a - (1/(1+prim.r))*aprime
-              if c > 0
-                value = (1/(1-prim.alpha))*(1/(c^(prim.alpha-1))-1) +
-                prim.beta*dot(prim.markov[state_index,:],v0[choice_index,:])
-                if value > max_value
-                  max_value = value
-                  sigma0[asset_index,state_index] = choice_index
-                  choice_lower = choice_index
-                end
+            end
+
+            if c > 0
+              value = (1/(1-prim.alpha))*(1/(c^(prim.alpha-1))-1) +
+              prim.beta*dot(prim.markov[state_index,:],v0[choice_index,:])
+              if value > max_value
+                max_value = value
+                sigma0[asset_index,state_index] = choice_index
+                choice_lower = choice_index
               end
             end
           end # borrowing constraint
@@ -331,7 +312,7 @@ function bellman_clean_sep!(prim::Primitives, v0::Array{Float64,2},
       not defaulting value and decision rule is not to default=#
       if Tvd[asset_index,state_index] > Tvnd[asset_index,state_index]
         d0[asset_index,state_index] = 1
-        sigma0[asset_index,state_index] = 0
+        sigma0[asset_index,state_index] = prim.zero_index
         Tv0[asset_index,state_index] = Tvd[asset_index,state_index]
       else
         Tv0[asset_index,state_index] = Tvnd[asset_index,state_index]
@@ -400,7 +381,8 @@ for state_hist_today in 1:2*N
   prim.a_s_indices[lookup_state_today,2]] # a' given (a,s)
   #= if agent doesn't default, restrict state/history tomorrow
   to no-bankrupt states/histories =#
-    if choice_index != 0
+    if res.d0[prim.a_s_indices[lookup_state_today,1],
+      prim.a_s_indices[lookup_state_today,2]] != 1
       for state_hist_tomorrow in 1:N
         lookup_state_tomorrow = state_hist_tomorrow
         if prim.a_s_indices[lookup_state_tomorrow,1] == choice_index
@@ -409,7 +391,7 @@ for state_hist_today in 1:2*N
             ,prim.a_s_indices[lookup_state_tomorrow,2]]
         end
       end
-    else #= if agent defaults, mass distributed to zero
+    else #= if agent defaults, mass distributed to assets=zero
       with a bankrupt history (split between employment states
       tomorrow) =#
       zero_tomorrow_high = N+prim.zero_index
@@ -423,7 +405,8 @@ for state_hist_today in 1:2*N
   lookup_state_today = state_hist_today-N # back out (a,s) combination index
   choice_index = res.sigma1[prim.a_s_indices[lookup_state_today,1],
   prim.a_s_indices[lookup_state_today,2]] # a' given (a,s)
-  #= agents cannot default and cannot have a < 0 =#
+  #= agents cannot default and cannot have a < 0 (flagged by policy
+  of 0) =#
     if choice_index != 0
       #= agents end up in no-bankrupt history with probability (1-rho)=#
       for state_hist_tomorrow in 1:N

@@ -8,7 +8,7 @@ using PyPlot
 include("bankruptcy_model.jl")
 
 function compute_pooling(;q0=0.01,max_iter=100,
-  max_iter_vfi=2000,epsilon=1e-3,a_size=500)
+  max_iter_vfi=2000,epsilon=1e-4,a_size=500)
 
   ## Starting range for pooling discount bond price
 
@@ -41,8 +41,8 @@ function compute_pooling(;q0=0.01,max_iter=100,
       for state_index in 1:prim.s_size
         for asset_index in 1:prim.a_size
           choice_index = results.sigma0[asset_index,state_index]
-          if choice_index < prim.zero_index && choice_index != 0
-            dist_index = asset_index+(state_index-1)*a_size # pick out entry in stationary distribution
+          if choice_index < prim.zero_index && results.d0[asset_index,state_index] != 1
+            dist_index = asset_index+(state_index-1)*prim.a_size # pick out entry in stationary distribution
             L += -prim.a_vals[choice_index]*results.statdist[dist_index]
           end
         end
@@ -52,9 +52,9 @@ function compute_pooling(;q0=0.01,max_iter=100,
       D = 0.0
       for state_index in 1:prim.s_size
         for asset_index in 1:prim.a_size
-          choice_index = results.sigma0[asset_index,state_index]
-          if choice_index == 0
-            dist_index = asset_index+(state_index-1)*a_size # pick out entry in stationary distribution
+          if results.d0[asset_index,state_index] == 1
+            # pick out entry in stationary distribution
+            dist_index = asset_index+(state_index-1)*prim.a_size
             D += -prim.a_vals[asset_index]*results.statdist[dist_index]
           end
         end
@@ -63,18 +63,19 @@ function compute_pooling(;q0=0.01,max_iter=100,
       # Loss rate
       Deltaprime = D/L
 
-      profits_pool = (1 - Deltaprime)/(1 + prim.r) - q_pool
+      profits_pool = (1 - Deltaprime)/(1 + prim.r) - prim.q_pool
 
     # Print iteration, net assets, and discount bond price
-    println("Iter: ", i, " Profits: ", profits_pool," q_pool: ", q_pool)
+    println("Iter: ", i, " Profits: ", profits_pool," q_pool: ", prim.q_pool)
 
     # Adjust q (and stop if asset market clears)
     if abs(profits_pool) < epsilon
         break
     elseif profits_pool > 0 # q too small
-      qlower = q_pool
+      qlower = prim.q_pool
     else # q too big
-      qupper = q_pool
+
+      qupper = prim.q_pool
     end
 
     q_pool = (qlower + qupper)/2
@@ -99,55 +100,71 @@ toc()
 pooling_prim = results[3]
 pooling_results = results[4]
 
-#= Since policy functions are not defined over default areas and
-value functions are not defined over negative assets for bankrupt
-histories, need to trim arrays =#
+#= Since policy functions are not defined over default regions
+need to trim index arrays and only return non-default policies. Also need to
+construct matching asset values for plotting =#
 
-policy_pool0 = pooling_results.sigma0[:,1]
+policyindex_emp1_pool = pooling_results.sigma1[:,1][pooling_results.sigma1[:,1].!=0]
+  a_vals_policy_emp1_pool = pooling_prim.a_vals[pooling_results.sigma1[:,1].!=0]
+policyindex_unemp1_pool = pooling_results.sigma1[:,2][pooling_results.sigma1[:,2].!=0]
+  a_vals_policy_unemp1_pool = pooling_prim.a_vals[pooling_results.sigma1[:,2].!=0]
 
-#policy_emp0_pool = pooling_prim.a_vals[pooling_results.sigma0[:,1]]
-#policy_emp1_pool = pooling_prim.a_vals[pooling_results.sigma1[:,1]]
-#policy_unemp0_pool = pooling_prim.a_vals[pooling_results.sigma0[:,2]]
-#policy_unemp1_pool = pooling_prim.a_vals[pooling_results.sigma1[:,2]]
+# Return values for policy functions and no-bankrupt value functions
+
+policy_emp0_pool = pooling_prim.a_vals[pooling_results.sigma0[:,1]]
+policy_unemp0_pool = pooling_prim.a_vals[pooling_results.sigma0[:,2]]
+policy_emp1_pool = pooling_prim.a_vals[policyindex_emp1_pool]
+policy_unemp1_pool = pooling_prim.a_vals[policyindex_unemp1_pool]
 value_emp0_pool = pooling_results.Tv0[:,1]
-value_emp1_pool = pooling_results.Tv1[:,1]
 value_unemp0_pool = pooling_results.Tv0[:,2]
-value_unemp1_pool = pooling_results.Tv1[:,2]
+
+#= Value functions only defined for bankrupt histories over positive assets.
+Trim value function arrays and construct corresponding asset values =#
+
+value_emp1_pool = pooling_results.Tv1[:,1][pooling_results.Tv1[:,1].!=-Inf]
+  a_vals_value_emp1_pool = pooling_prim.a_vals[pooling_results.Tv1[:,1].!=-Inf]
+value_unemp1_pool = pooling_results.Tv1[:,2][pooling_results.Tv1[:,2].!=-Inf]
+  a_vals_value_unemp1_pool = pooling_prim.a_vals[pooling_results.Tv1[:,2].!=-Inf]
 
 # Plot value functions
 
 valfig = figure()
 plot(pooling_prim.a_vals,value_emp0_pool,color="blue",linewidth=2.0,label="Employed (h=0)")
 plot(pooling_prim.a_vals,value_unemp0_pool,color="red",linewidth=2.0,label="Unemployed (h=0)")
+plot(a_vals_value_emp1_pool,value_emp1_pool,color="green",linewidth=2.0,label="Employed (h=1)")
+plot(a_vals_value_unemp1_pool,value_unemp1_pool,color="yellow",linewidth=2.0,label="Unemployed (h=1)")
 xlabel("a")
 ylabel("v(a,s,h)")
 legend(loc="lower right")
-title("Value Functions")
+title("Value Functions (Pooling)")
 ax = PyPlot.gca()
-ax[:set_ylim]((-20,1))
-savefig("C:/Users/j0el/Documents/Wisconsin/899/Problem Sets/PS4/Pictures/policyfunctions.pgf")
+ax[:set_ylim]((-20,2))
+savefig("C:/Users/j0el/Documents/Wisconsin/899/Problem Sets/PS4b/Pictures/valuefunctions_pool.pgf")
 
 # Plot value function
 
-valfig = figure()
-plot(huggett.a_vals,value_emp,color="blue",linewidth=2.0,label="Employed")
-plot(huggett.a_vals,value_unemp,color="red",linewidth=2.0,label="Unemployed")
+polfig = figure()
+plot(pooling_prim.a_vals,policy_emp0_pool,color="blue",linewidth=2.0,label="Employed (h=0)")
+plot(pooling_prim.a_vals,policy_unemp0_pool,color="red",linewidth=2.0,label="Unemployed (h=0)")
+plot(a_vals_policy_emp1_pool,policy_emp1_pool,color="green",linewidth=2.0,label="Employed (h=1)")
+plot(a_vals_policy_unemp1_pool,policy_unemp1_pool,color="yellow",linewidth=2.0,label="Unemployed (h=1)")
+plot(pooling_prim.a_vals,pooling_prim.a_vals,color="black",linewidth=1.0)
 xlabel("a")
-ylabel("V(a,s)")
+ylabel("g(a,s,h)")
 legend(loc="lower right")
-title("Value Functions")
+title("Policy Functions (Pooling)")
 ax = PyPlot.gca()
-ax[:set_ylim]((-10,5))
-savefig("C:/Users/j0el/Documents/Wisconsin/899/Problem Sets/PS4/Pictures/valuefunctions.pgf")
+ax[:set_ylim]((-1,5))
+ax[:set_xlim]((-0.525,5))
+savefig("C:/Users/j0el/Documents/Wisconsin/899/Problem Sets/PS4b/Pictures/policyfunctions_pool.pgf")
 
 
 # Plot stationary distribution
-
-distfig = figure()
-bar(huggett.a_vals,huggett_results.statdist[1:huggett.a_size],
-  color="blue",label="Employed")
-bar(huggett.a_vals,huggett_results.statdist[huggett.a_size+1:huggett.N],
-  color="red",label="Unemployed")
-title("Wealth Distribution")
-legend(loc="upper right")
-savefig("C:/Users/j0el/Documents/Wisconsin/899/Problem Sets/PS4/Pictures/stationarydistributions.pgf")
+# distfig = figure()
+# bar(huggett.a_vals,huggett_results.statdist[1:huggett.a_size],
+#   color="blue",label="Employed")
+# bar(huggett.a_vals,huggett_results.statdist[huggett.a_size+1:huggett.N],
+#   color="red",label="Unemployed")
+# title("Wealth Distribution")
+# legend(loc="upper right")
+# savefig("C:/Users/j0el/Documents/Wisconsin/899/Problem Sets/PS4/Pictures/stationarydistributions.pgf")
