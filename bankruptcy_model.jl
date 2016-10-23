@@ -32,7 +32,7 @@ end
 ## Outer Constructor for Primitives
 
 function Primitives(;beta::Float64=0.8, alpha::Float64=1.5,
-  r::Float64=0.04, q_pool::Float64=0.9, rho::Float64=0.9,
+  r::Float64=0.04, q_pool::Float64=0.5, rho::Float64=0.9,
   a_min::Float64=-0.525, a_max::Float64=5.0, a_size::Int64=100,
   markov=[0.75 (1-0.75);(1-0.75) 0.75], s_vals = [1, 0.05])
 
@@ -78,7 +78,7 @@ type Results
     num_dist::Int
 
     function Results(prim::Primitives)
-        v0 = zeros(prim.a_size,prim.s_size) # Initialise value with zeroes
+        v0 = zeros(prim.a_size,prim.s_size) # Initialize value with zeroes
         v1 = zeros(prim.a_size,prim.s_size)
         # Initialize stationary distribution with uniform over no-bankruptcy
         statdist = vcat(ones(prim.N),zeros(prim.N))*(1/prim.N)
@@ -102,9 +102,9 @@ end
 
 ## Solve Discrete Dynamic Program
 
-# Without initial value function (will be initialized at zeros)
+# Without initial value functions (will be initialized at zeros)
 function SolveProgram(prim::Primitives, bellman_clean::Function;
-  max_iter_vfi::Integer=2000, epsilon_vfi::Real=1e-3,
+  max_iter_vfi::Integer=2000, epsilon_vfi::Real=1e-4,
   max_iter_statdist::Integer=500, epsilon_statdist::Real=1e-4)
     res = Results(prim)
     vfi!(prim, res, max_iter_vfi, epsilon_vfi,bellman_clean)
@@ -115,7 +115,7 @@ end
 # With Initial value functions v0, v1
 function SolveProgram(prim::Primitives, v0::Array{Float64,2},
   v1::Array{Float64,2}, bellman_clean::Function;
-  max_iter_vfi::Integer=2000, epsilon_vfi::Real=1e-3,
+  max_iter_vfi::Integer=2000, epsilon_vfi::Real=1e-4,
   max_iter_statdist::Integer=500, epsilon_statdist::Real=1e-4)
     res = Results(prim, v0, v1)
     vfi!(prim, res, max_iter_vfi, epsilon_vfi, bellman_clean)
@@ -150,13 +150,13 @@ function bellman_defaulted!(prim::Primitives, v0::Array{Float64,2},
     max_value = -Inf # initialize value for (a,s) combinations
 
       # Bankrupt history values only defined for positive assets
-      if a >= 0
+      if a >= 0.00
         for choice_index in choice_lower:prim.a_size
           # check if choice is greater than zero. (no borrowing)
-          if prim.a_vals[choice_index] >= 0
+          if prim.a_vals[choice_index] >= 0.00
             aprime = prim.a_vals[choice_index]
             c = s + a - (1/(1+prim.r))*aprime
-            if c > 0
+            if c > 0.00
               value = (1/(1-prim.alpha))*(1/(c^(prim.alpha-1))-1) +
               prim.beta*dot(prim.markov[state_index,:],
               (prim.rho*v1[choice_index,:]+
@@ -204,7 +204,7 @@ function bellman_clean_pool!(prim::Primitives, v0::Array{Float64,2},
       a = prim.a_vals[asset_index]
 
       # if assets are negative, calculate value when defaulting
-      if a < 0
+      if a < 0.00
         Tvd[asset_index, state_index] = (1/(1-prim.alpha))*
           (1/(s^(prim.alpha-1))-1) + prim.beta*
           dot(prim.markov[state_index,:],v1[prim.zero_index,:])
@@ -216,13 +216,13 @@ function bellman_clean_pool!(prim::Primitives, v0::Array{Float64,2},
           aprime = prim.a_vals[choice_index]
 
           # saving and borrowing at different rates
-          if aprime <= 0 # borrow at market raets
-            c = s + a - prim.q_menu[choice_index,state_index]*aprime
+          if aprime <= 0.00 # borrow at market raets
+            c = s + a - prim.q_pool*aprime
           else # save at risk-free rates
             c = s + a - (1/(1+prim.r))*aprime
           end
 
-          if c > 0
+          if c > 0.00
             value = (1/(1-prim.alpha))*(1/(c^(prim.alpha-1))-1) +
             prim.beta*dot(prim.markov[state_index,:],v0[choice_index,:])
             if value > max_value
@@ -274,7 +274,7 @@ function bellman_clean_sep!(prim::Primitives, v0::Array{Float64,2},
       a = prim.a_vals[asset_index]
 
       # if assets are negative, calculate value when defaulting
-      if a < 0
+      if a < 0.00
         Tvd[asset_index, state_index] = (1/(1-prim.alpha))*
           (1/(s^(prim.alpha-1))-1) + prim.beta*
           dot(prim.markov[state_index,:],v1[prim.zero_index,:])
@@ -289,13 +289,13 @@ function bellman_clean_sep!(prim::Primitives, v0::Array{Float64,2},
           if aprime >= prim.a_min_sep[choice_index,state_index]
 
             # saving and borrowing at different rates
-            if aprime <= 0 # borrow at market raets
+            if aprime <= 0.00 # borrow at market raets
               c = s + a - prim.q_menu[choice_index,state_index]*aprime
             else # save at risk-free rates
               c = s + a - (1/(1+prim.r))*aprime
             end
 
-            if c > 0
+            if c > 0.00
               value = (1/(1-prim.alpha))*(1/(c^(prim.alpha-1))-1) +
               prim.beta*dot(prim.markov[state_index,:],v0[choice_index,:])
               if value > max_value
@@ -359,7 +359,6 @@ function create_statdist!(prim::Primitives, res::Results,
   max_iter::Integer, epsilon::Real)
 
 N = prim.N
-Nover2 = convert(Int64,N/2)
 
 ## Transition Matrix
 
@@ -394,8 +393,8 @@ for state_hist_today in 1:2*N
     else #= if agent defaults, mass distributed to assets=zero
       with a bankrupt history (split between employment states
       tomorrow) =#
-      zero_tomorrow_high = N+prim.zero_index
-      zero_tomorrow_low = N+Nover2+prim.zero_index
+      zero_tomorrow_high = N + prim.zero_index
+      zero_tomorrow_low = N + prim.a_size + prim.zero_index
       Tstar[state_hist_today,zero_tomorrow_high] =
         prim.markov[prim.a_s_indices[lookup_state_today,2],1]
       Tstar[state_hist_today,zero_tomorrow_low] =

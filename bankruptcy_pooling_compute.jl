@@ -1,14 +1,18 @@
 #=
-Program Name: bankruptcy_compute.jl
-Runs bankruptcy model
+Program Name: bankruptcy_pooling_compute.jl
+Runs bankruptcy model (pooling)
 =#
 
 using PyPlot
 
 include("bankruptcy_model.jl")
 
-function compute_pooling(;q0=0.01,max_iter=100,
-  max_iter_vfi=2000,epsilon=1e-4,a_size=500)
+#= Pooling Equilibrium =#
+
+function compute_pooling(;q0=0.01,max_iter=100,epsilon=1e-4,
+  max_iter_vfi=2000,max_iter_statdist=500,
+  epsilon_vfi=1e-4,epsilon_statdist=1e-4,
+  a_size=500)
 
   ## Starting range for pooling discount bond price
 
@@ -33,7 +37,9 @@ function compute_pooling(;q0=0.01,max_iter=100,
   for i in 1:max_iter
 
     # Solve dynamic program given new q_pool
-    results = SolveProgram(prim,v0,v1,bellman_clean_pool!,max_iter_vfi=max_iter_vfi)
+    results = SolveProgram(prim,v0,v1,bellman_clean_pool!,
+      max_iter_vfi=max_iter_vfi,max_iter_statdist=max_iter_statdist,
+      epsilon_vfi=epsilon_vfi,epsilon_statdist=epsilon_statdist)
 
     ## Calculate loss rate for lenders
       # Total assets lent. Note only lent to no-bankrupt history agents
@@ -71,10 +77,9 @@ function compute_pooling(;q0=0.01,max_iter=100,
     # Adjust q (and stop if asset market clears)
     if abs(profits_pool) < epsilon
         break
-    elseif profits_pool > 0 # q too small
+    elseif profits_pool > 0.00 # q too small
       qlower = prim.q_pool
     else # q too big
-
       qupper = prim.q_pool
     end
 
@@ -157,14 +162,3 @@ ax = PyPlot.gca()
 ax[:set_ylim]((-1,5))
 ax[:set_xlim]((-0.525,5))
 savefig("C:/Users/j0el/Documents/Wisconsin/899/Problem Sets/PS4b/Pictures/policyfunctions_pool.pgf")
-
-
-# Plot stationary distribution
-# distfig = figure()
-# bar(huggett.a_vals,huggett_results.statdist[1:huggett.a_size],
-#   color="blue",label="Employed")
-# bar(huggett.a_vals,huggett_results.statdist[huggett.a_size+1:huggett.N],
-#   color="red",label="Unemployed")
-# title("Wealth Distribution")
-# legend(loc="upper right")
-# savefig("C:/Users/j0el/Documents/Wisconsin/899/Problem Sets/PS4/Pictures/stationarydistributions.pgf")
