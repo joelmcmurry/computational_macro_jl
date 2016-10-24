@@ -39,7 +39,8 @@ function compute_pooling(;q0=0.01,max_iter=100,epsilon=1e-4,
     # Solve dynamic program given new q_pool
     results = SolveProgram(prim,v0,v1,bellman_clean_pool!,
       max_iter_vfi=max_iter_vfi,max_iter_statdist=max_iter_statdist,
-      epsilon_vfi=epsilon_vfi,epsilon_statdist=epsilon_statdist)
+      epsilon_vfi=epsilon_vfi,epsilon_statdist=epsilon_statdist,
+      distflag="yes")
 
     ## Calculate loss rate for lenders
       # Total assets lent. Note only lent to no-bankrupt history agents
@@ -99,7 +100,7 @@ profits_pool, q_pool, prim, results
 end
 
 tic()
-results = compute_pooling(max_iter=100,a_size=2000)
+results = compute_pooling(max_iter=100,a_size=500)
 toc()
 
 pooling_prim = results[3]
