@@ -14,8 +14,13 @@ function compute_separating(;q0=0.01,max_iter=100,epsilon=1e-4,
   epsilon_vfi=1e-4,epsilon_statdist=1e-4,
   a_size=500)
 
+  ## Starting range for pooling discount bond price
+
+  qlower = q0*ones(prim.a_size,prim.s_size)
+  qupper = ones(prim.a_size,prim.s_size)
+
   # Initialize primitives
-  prim = Primitives(q_pool=q0,a_size=a_size)
+  prim = Primitives(q_pool=q0/2,a_size=a_size)
 
   # Initial guess for value functions
   v0 = zeros(prim.a_size,prim.s_size)
@@ -52,7 +57,13 @@ function compute_separating(;q0=0.01,max_iter=100,epsilon=1e-4,
 
     zero_profit_target = 1/(1+prim.r)*ones(Float64,prim.a_size,prim.s_size)-delta_sep./(1+prim.r)
 
-    profits_sep = zero_profit_target - prim.q_menu
+    # Calculate implicit borrowing constraints
+    for state_today in 1:prim.s_size
+      prim.a_min_sep[state_today] =
+        maximum(find(zero_profit_target[:,state_today].==0.0))
+    end
+
+    profits_sep = prim.q_menu- zero_profit_target
 
     # Print iteration, net assets, and discount bond price
     println("Iter: ", i, " Max Profits: ", maximum(abs(profits_sep)))
@@ -63,19 +74,19 @@ function compute_separating(;q0=0.01,max_iter=100,epsilon=1e-4,
     else
       for state_today in 1:prim.s_size
         for asset_tomorrow in 1:prim.a_size
-          if profits_sep[asset_tomorrow,state_today] > 0.00 # q too small
-            prim.q_menu[asset_tomorrow,state_today] = SOME THING HERE
-          elseif profits_sep[asset_tomorrow,state_today] < 0.00 # q too big
-            prim.q_menu[asset_tomorrow,state_today] = SOME THING HERE
+          if profits_sep[asset_tomorrow,state_today] > 0.00 # q too large
+            qupper[asset_tomorrow,state_today] =
+              prim.q_menu[asset_tomorrow,state_today]
+          elseif profits_sep[asset_tomorrow,state_today] < 0.00 # q too small
+            qlower[asset_tomorrow,state_today] =
+              prim.q_menu[asset_tomorrow,state_today]
           end
         end
       end
     end
 
-    q_sep = (qlower + qupper)/2
-
-    # Update primitives given new q
-    prim.q_sep = q_sep
+    # Update primitives given new q menu
+    prim.q_menu = (qlower + qupper)./2
 
     # Update guess for value function
     v0 = results.Tv0
@@ -83,7 +94,7 @@ function compute_separating(;q0=0.01,max_iter=100,epsilon=1e-4,
 
   end
 
-profits_sep, q_sep, prim, results
+profits_sep, q_menu, prim, results
 
 end
 

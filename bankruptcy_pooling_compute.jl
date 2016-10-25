@@ -70,7 +70,7 @@ function compute_pooling(;q0=0.01,max_iter=100,epsilon=1e-4,
       # Loss rate
       Deltaprime = D/L
 
-      profits_pool = (1 - Deltaprime)/(1 + prim.r) - prim.q_pool
+      profits_pool = prim.q_pool - (1 - Deltaprime)/(1 + prim.r)
 
     # Print iteration, net assets, and discount bond price
     println("Iter: ", i, " Profits: ", profits_pool," q_pool: ", prim.q_pool)
@@ -78,10 +78,10 @@ function compute_pooling(;q0=0.01,max_iter=100,epsilon=1e-4,
     # Adjust q (and stop if asset market clears)
     if abs(profits_pool) < epsilon
         break
-    elseif profits_pool > 0.00 # q too small
-      qlower = prim.q_pool
-    else # q too big
+    elseif profits_pool > 0.00 # q too large
       qupper = prim.q_pool
+    else # q too small
+      qlower = prim.q_pool
     end
 
     q_pool = (qlower + qupper)/2

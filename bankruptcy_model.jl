@@ -52,8 +52,8 @@ function Primitives(;beta::Float64=0.8, alpha::Float64=1.5,
   N = a_size*s_size
   a_s_vals = gridmake(a_vals,s_vals)
   a_s_indices = gridmake(1:a_size,1:s_size)
-  q_menu = ones(a_size,2)*q_pool
-  a_min_sep = ones(a_size,2)*a_min
+  q_menu = ones(a_size,s_size)*q_pool
+  a_min_sep = ones(prim.s_size)*a_min
 
   primitives = Primitives(beta, alpha, r, q_pool, q_menu, rho, a_min,
   a_max, a_min_sep, a_size, a_vals, a_indices, s_size,
@@ -289,10 +289,11 @@ function bellman_clean_sep!(prim::Primitives, v0::Array{Float64,2},
         max_value = -Inf # initialize value for (a,s) combinations
 
         for choice_index in choice_lower:prim.a_size
-          aprime = prim.a_vals[choice_index]
 
           # check if asset choice is above borrowing constraints
-          if aprime >= prim.a_min_sep[choice_index,state_index]
+          if choice_index >= prim.a_min_sep[state_index]
+
+          aprime = prim.a_vals[choice_index]
 
             # saving and borrowing at different rates
             if aprime <= 0.00 # borrow at market raets
