@@ -29,58 +29,47 @@ function compute_separating(;q0=0.01,max_iter=100,epsilon=1e-4,
 
   for i in 1:max_iter
 
-    # Solve dynamic program given new q_sep
+    # Solve dynamic program given new q_sep menu
     results = SolveProgram(prim,v0,v1,bellman_clean_sep!,
-      max_iter_vfi=max_iter_vfi,max_iter_statdist=max_iter_statdist,
-      epsilon_vfi=epsilon_vfi,epsilon_statdist=epsilon_statdist,
+      max_iter_vfi=max_iter_vfi,epsilon_vfi=epsilon_vfi,
       distflag="no")
 
     ## Calculate loss rate for lenders (on each contract)
 
+    # Initialize lender loss rate
+    delta_sep = zeros(Float64,prim.a_size,prim.s_size)
+
     for state_today in 1:prim.s_size
       for asset_tomorrow in 1:prim.a_size
-        
+        if results.d0[asset_tomorrow,1] == 1 # look in high state tomorrow
+          delta_sep[asset_tomorrow,state_today] += prim.markov[state_today,1]
+        end
+        if results.d0[asset_tomorrow,2] == 1 # look in low state tomorrow
+          delta_sep[asset_tomorrow,state_today] += prim.markov[state_today,2]
+        end
       end
     end
-      # Total assets lent. Note only lent to no-bankrupt history agents
-      L = 0.0
-      for state_index in 1:prim.s_size
-        for asset_index in 1:prim.a_size
-          choice_index = results.sigma0[asset_index,state_index]
-          if choice_index < prim.zero_index && results.d0[asset_index,state_index] != 1
-            dist_index = asset_index+(state_index-1)*prim.a_size # pick out entry in stationary distribution
-            L += -prim.a_vals[choice_index]*results.statdist[dist_index]
-          end
-        end
-      end
 
-      # Total defaulted assets
-      D = 0.0
-      for state_index in 1:prim.s_size
-        for asset_index in 1:prim.a_size
-          if results.d0[asset_index,state_index] == 1
-            # pick out entry in stationary distribution
-            dist_index = asset_index+(state_index-1)*prim.a_size
-            D += -prim.a_vals[asset_index]*results.statdist[dist_index]
-          end
-        end
-      end
+    zero_profit_target = 1/(1+prim.r)*ones(Float64,prim.a_size,prim.s_size)-delta_sep./(1+prim.r)
 
-      # Loss rate
-      Deltaprime = D/L
-
-      profits_sep = (1 - Deltaprime)/(1 + prim.r) - prim.q_sep
+    profits_sep = zero_profit_target - prim.q_menu
 
     # Print iteration, net assets, and discount bond price
-    println("Iter: ", i, " Profits: ", profits_sep," q_sep: ", prim.q_sep)
+    println("Iter: ", i, " Max Profits: ", maximum(abs(profits_sep)))
 
     # Adjust q (and stop if asset market clears)
-    if abs(profits_sep) < epsilon
+    if maximum(abs(profits_sep)) < epsilon
         break
-    elseif profits_sep > 0.00 # q too small
-      qlower = prim.q_sep
-    else # q too big
-      qupper = prim.q_sep
+    else
+      for state_today in 1:prim.s_size
+        for asset_tomorrow in 1:prim.a_size
+          if profits_sep[asset_tomorrow,state_today] > 0.00 # q too small
+            prim.q_menu[asset_tomorrow,state_today] = SOME THING HERE
+          elseif profits_sep[asset_tomorrow,state_today] < 0.00 # q too big
+            prim.q_menu[asset_tomorrow,state_today] = SOME THING HERE
+          end
+        end
+      end
     end
 
     q_sep = (qlower + qupper)/2

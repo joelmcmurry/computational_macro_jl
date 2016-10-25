@@ -100,7 +100,7 @@ profits_pool, q_pool, prim, results
 end
 
 tic()
-results = compute_pooling(max_iter=100,a_size=500)
+results = compute_pooling(max_iter=100,a_size=2000)
 toc()
 
 pooling_prim = results[3]
