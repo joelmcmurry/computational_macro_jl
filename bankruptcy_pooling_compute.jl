@@ -99,11 +99,51 @@ profits_pool, q_pool, prim, results
 end
 
 tic()
-results = compute_pooling(max_iter=100,a_size=500)
+pooling_eq = compute_pooling(max_iter=100,a_size=500)
 toc()
 
-prim_pool = results[3]
-results_pool = results[4]
+prim_pool = pooling_eq[3]
+results_pool = pooling_eq[4]
+
+## Calculate debt-to-income rate
+
+  #= Collapse stationary distribution over all state/histories
+  to stationary distribution over assets. For each asset level there
+  are four possible (s,h) combinations =#
+
+  statdist_assets_pool = results_pool.statdist[1:prim_pool.a_size] +
+    results_pool.statdist[prim_pool.a_size+1:2*prim_pool.a_size] +
+    results_pool.statdist[2*prim_pool.a_size+1:3*prim_pool.a_size] +
+    results_pool.statdist[3*prim_pool.a_size+1:4*prim_pool.a_size]
+
+  debt_pool = dot(prim_pool.a_vals[1:prim_pool.zero_index],
+    statdist_assets_pool[1:prim_pool.zero_index])
+
+  # Total income is average of earnings values since half the population is each
+
+  income_pool = sum(prim_pool.s_vals)/2
+
+  debt_to_income_pool = debt_pool/income_pool
+
+## Calculate economywide default rate (recall only no-bankrupt history can default)
+
+  default_rate_pool = dot(results_pool.statdist[1:prim_pool.N],
+    vcat(results_pool.d0[:,1],results_pool.d0[:,2]))
+
+#= Output Moments =#
+
+  # Income
+
+  avg_inc_pool = sum(prim_pool.s_vals[1]*(results_pool.statdist[1:prim_pool.a_size]+
+    results_pool.statdist[prim_pool.N+1:prim_pool.N+prim_pool.a_size])) +
+    sum(prim_pool.s_vals[2]*(results_pool.statdist[prim_pool.a_size+1:prim_pool.N]+
+      results_pool.statdist[prim_pool.N+prim_pool.a_size+1:prim_pool.N*2]))
+
+  # Savings
+  
+  avg_savings_pool =
+
+#= Graphs =#
 
 #= Since policy functions are not defined over default regions
 need to trim index arrays and only return non-default policies. Also need to
@@ -182,3 +222,60 @@ ax = PyPlot.gca()
 ax[:set_ylim]((-1,5))
 ax[:set_xlim]((0,5))
 savefig("C:/Users/j0el/Documents/Wisconsin/899/Problem Sets/PS4b/Pictures/policyfunctions1_pool.pgf")
+
+# Plot default decision rule
+
+decfig = figure()
+plot(prim_pool.a_vals,results_pool.d0[:,1],color="blue",linewidth=2.0,label="Employed")
+plot(prim_pool.a_vals,results_pool.d0[:,2],color="red",linewidth=2.0,label="Unemployed")
+xlabel("a")
+ylabel("d(a,s,0)")
+legend(loc="lower right")
+title("Default Decision Rule (Pooling)")
+ax = PyPlot.gca()
+ax[:set_ylim]((-1,2))
+ax[:set_xlim]((-0.525,5))
+savefig("C:/Users/j0el/Documents/Wisconsin/899/Problem Sets/PS4b/Pictures/decisionrule_pool.pgf")
+
+# Bond prices
+
+bondfig = figure()
+plot(prim_pool.a_vals,prim_pool.q_pool*ones(Float64,prim_pool.a_size),color="blue",linewidth=2.0,label="Employed")
+plot(prim_pool.a_vals,prim_pool.q_pool*ones(Float64,prim_pool.a_size),color="red",linewidth=2.0,label="Unemployed")
+xlabel("a")
+ylabel("q(a,s,0)")
+legend(loc="lower right")
+title("Bond Prices (Pooling)")
+ax = PyPlot.gca()
+ax[:set_ylim]((0,1))
+ax[:set_xlim]((-0.525,5))
+savefig("C:/Users/j0el/Documents/Wisconsin/899/Problem Sets/PS4b/Pictures/bondprices_pool.pgf")
+
+# Distribution
+
+distfig1 = figure()
+PyPlot.bar(prim_pool.a_vals,results_pool.statdist[1:prim_pool.a_size],
+  width=0.1,alpha=0.5,color="blue",label="mu(a,s=1,h=0)")
+title("Distribution - Pooling (Employed/No-Bankruptcy)")
+legend(loc="upper right")
+savefig("C:/Users/j0el/Documents/Wisconsin/899/Problem Sets/PS4b/Pictures/distemp0_pool.pgf")
+
+distfig2 = figure()
+PyPlot.bar(prim_pool.a_vals,results_pool.statdist[prim_pool.a_size+1:prim_pool.N],
+  width=0.1,alpha=0.5,color="red",label="mu(a,s=0.05,h=0)")
+title("Distribution - Pooling (Unemployed/No-Bankruptcy)")
+legend(loc="upper right")
+savefig("C:/Users/j0el/Documents/Wisconsin/899/Problem Sets/PS4b/Pictures/distunemp0_pool.pgf")
+
+distfig3 = figure()
+PyPlot.bar(prim_pool.a_vals,results_pool.statdist[prim_pool.N+1:prim_pool.N+prim_pool.a_size],
+  width=0.1,alpha=0.5,color="green",label="mu(a,s=1,h=1)")
+title("Distribution - Pooling (Employed/Bankruptcy)")
+legend(loc="upper right")
+savefig("C:/Users/j0el/Documents/Wisconsin/899/Problem Sets/PS4b/Pictures/distemp1_pool.pgf")
+
+distfig4 = figure()
+PyPlot.bar(prim_pool.a_vals,results_pool.statdist[prim_pool.N+prim_pool.a_size+1:prim_pool.N*2],width=0.1,alpha=0.5,color="yellow",label="mu(a,s=0.05,h=1)")
+title("Distribution - Pooling (Unemployed/Bankruptcy)")
+legend(loc="upper right")
+savefig("C:/Users/j0el/Documents/Wisconsin/899/Problem Sets/PS4b/Pictures/distunemp1_pool.pgf")

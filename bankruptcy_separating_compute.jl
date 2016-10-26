@@ -103,13 +103,85 @@ profits_sep, q_menu, prim, results
 end
 
 tic()
-results = compute_separating(max_iter=100,a_size=1000)
+separating_eq = compute_separating(max_iter=100,a_size=500)
 toc()
 
-profits_sep = results[1]
-q_menu = results[2]
-prim_sep = results[3]
-results_sep = results[4]
+profits_sep = separating_eq[1]
+q_menu = separating_eq[2]
+prim_sep = separating_eq[3]
+results_sep = separating_eq[4]
+
+## Calculate debt-to-income rate
+
+  #= Collapse stationary distribution over all state/histories
+  to stationary distribution over assets. For each asset level there
+  are four possible (s,h) combinations =#
+
+  statdist_assets_sep = results_sep.statdist[1:prim_sep.a_size] +
+    results_sep.statdist[prim_sep.a_size+1:2*prim_sep.a_size] +
+    results_sep.statdist[2*prim_sep.a_size+1:3*prim_sep.a_size] +
+    results_sep.statdist[3*prim_sep.a_size+1:4*prim_sep.a_size]
+
+  debt_sep = dot(prim_sep.a_vals[1:prim_sep.zero_index],
+    statdist_assets_sep[1:prim_sep.zero_index])
+
+  # Total income is average of earnings values since half the population is each
+
+  income_sep = sum(prim_sep.s_vals)/2
+
+  debt_to_income_sep = debt_sep/income_sep
+
+## Calculate economywide default rate (recall only no-bankrupt history can default)
+
+  default_rate_sep = dot(results_sep.statdist[1:prim_sep.N],
+    vcat(results_sep.d0[:,1],results_sep.d0[:,2]))
+
+## Calculate interest rate menu implied by bond prices
+
+  int_menu_sep = ones(Float64,prim_sep.a_size,prim_sep.s_size)./
+    prim_sep.q_menu-ones(Float64,prim_sep.a_size,prim_sep.s_size)
+
+  # Find interest rates chosen in equilibrium
+
+  int_chosen_sep = zeros(Float64,prim_sep.a_size,prim_sep.s_size)
+
+  for state_today in 1:prim_sep.s_size
+    for asset_today in 1:prim_sep.a_size
+      int_chosen_sep[asset_today,state_today] =
+          int_menu_sep[results_sep.sigma0[asset_today,state_today],
+            state_today]
+    end
+  end
+
+  # Calculate distribution of interest rates chosen in equilibrium
+
+  int_rate_emp = sort(union(int_chosen_sep[:,1],linspace(0,1,100)))
+  int_rate_unemp = sort(union(int_chosen_sep[:,2],linspace(0,1,100)))
+
+  int_dist_emp = zeros(Float64,size(int_rate_emp))
+  int_dist_unemp = zeros(Float64,size(int_rate_unemp))
+
+  # Distribution for employed (normalize by mass of employed/no-bankrupt)
+  for i in 1:size(int_rate_emp)[1]
+    for j in 1:prim_sep.a_size
+      if int_chosen_sep[j,1] == int_rate_emp[i]
+        int_dist_emp[i] += results_sep.statdist[j]
+      end
+    end
+  end
+  int_dist_emp=int_dist_emp./sum(results_sep.statdist[1:prim_sep.a_size])
+
+  # Distribution for unemployed (normalize by mass of unemployed/no-bankrupt)
+  for i in 1:size(int_rate_unemp)[1]
+    for j in 1:prim_sep.a_size
+      if int_chosen_sep[j,2] == int_rate_unemp[i]
+        int_dist_unemp[i] += results_sep.statdist[j+prim_sep.a_size]
+      end
+    end
+  end
+  int_dist_unemp=int_dist_unemp./sum(results_sep.statdist[prim_sep.a_size+1:prim_sep.N])
+
+#= Graphs =#
 
 #= Since policy functions are not defined over default regions
 need to trim index arrays and only return non-default policies. Also need to
@@ -159,7 +231,7 @@ legend(loc="lower right")
 title("Value Functions (Separating - Bankruptcy)")
 ax = PyPlot.gca()
 ax[:set_ylim]((-20,2))
-savefig("C:/Users/j0el/Documents/Wisconsin/899/Problem Sets/PS4b/Pictures/valuefunctions0_sep.pgf")
+savefig("C:/Users/j0el/Documents/Wisconsin/899/Problem Sets/PS4b/Pictures/valuefunctions1_sep.pgf")
 
 # Plot value function
 
@@ -188,3 +260,74 @@ ax = PyPlot.gca()
 ax[:set_ylim]((-1,5))
 ax[:set_xlim]((0,5))
 savefig("C:/Users/j0el/Documents/Wisconsin/899/Problem Sets/PS4b/Pictures/policyfunctions1_sep.pgf")
+
+# Plot default decision rule
+
+decfig = figure()
+plot(prim_sep.a_vals,results_sep.d0[:,1],color="blue",linewidth=2.0,label="Employed")
+plot(prim_sep.a_vals,results_sep.d0[:,2],color="red",linewidth=2.0,label="Unemployed")
+xlabel("a")
+ylabel("d(a,s,0)")
+legend(loc="lower right")
+title("Default Decision Rule (Separating)")
+ax = PyPlot.gca()
+ax[:set_ylim]((-1,2))
+ax[:set_xlim]((-0.525,5))
+savefig("C:/Users/j0el/Documents/Wisconsin/899/Problem Sets/PS4b/Pictures/decisionrule_sep.pgf")
+
+# Bond prices
+
+bondfig = figure()
+plot(prim_sep.a_vals,prim_sep.q_menu[:,1],color="blue",linewidth=2.0,label="Employed")
+plot(prim_sep.a_vals,prim_sep.q_menu[:,2],color="red",linewidth=2.0,label="Unemployed")
+xlabel("a")
+ylabel("q(a,s,0)")
+legend(loc="lower right")
+title("Bond Prices (Separating)")
+ax = PyPlot.gca()
+ax[:set_ylim]((0,1))
+ax[:set_xlim]((-0.525,0))
+savefig("C:/Users/j0el/Documents/Wisconsin/899/Problem Sets/PS4b/Pictures/bondprices_sep.pgf")
+
+# Interest Rates
+
+intfig_emp = figure()
+bar(int_rate_emp,int_dist_emp,width=0.02)
+title("Distribution of Interest Rates (Separating - Employed)")
+legend(loc="upper right")
+savefig("C:/Users/j0el/Documents/Wisconsin/899/Problem Sets/PS4b/Pictures/interestdist_emp_sep.pgf")
+
+intfig_unemp = figure()
+PyPlot.bar(int_rate_unemp,int_dist_unemp,width=0.02)
+title("Distribution of Interest Rates (Separating - Unemployed)")
+legend(loc="upper right")
+savefig("C:/Users/j0el/Documents/Wisconsin/899/Problem Sets/PS4b/Pictures/interestdist_unemp_sep.pgf")
+
+# Distribution
+
+distfig1 = figure()
+PyPlot.bar(prim_sep.a_vals,results_sep.statdist[1:prim_sep.a_size],
+  width=0.1,alpha=0.5,color="blue",label="mu(a,s=1,h=0)")
+title("Distribution - Separating (Employed/No-Bankruptcy)")
+legend(loc="upper right")
+savefig("C:/Users/j0el/Documents/Wisconsin/899/Problem Sets/PS4b/Pictures/distemp0_sep.pgf")
+
+distfig2 = figure()
+PyPlot.bar(prim_sep.a_vals,results_sep.statdist[prim_sep.a_size+1:prim_sep.N],
+  width=0.1,alpha=0.5,color="red",label="mu(a,s=0.05,h=0)")
+title("Distribution - Separating (Unemployed/No-Bankruptcy)")
+legend(loc="upper right")
+savefig("C:/Users/j0el/Documents/Wisconsin/899/Problem Sets/PS4b/Pictures/distunemp0_sep.pgf")
+
+distfig3 = figure()
+PyPlot.bar(prim_sep.a_vals,results_sep.statdist[prim_sep.N+1:prim_sep.N+prim_sep.a_size],
+  width=0.1,alpha=0.5,color="green",label="mu(a,s=1,h=1)")
+title("Distribution - Separating (Employed/Bankruptcy)")
+legend(loc="upper right")
+savefig("C:/Users/j0el/Documents/Wisconsin/899/Problem Sets/PS4b/Pictures/distemp1_sep.pgf")
+
+distfig4 = figure()
+PyPlot.bar(prim_sep.a_vals,results_sep.statdist[prim_sep.N+prim_sep.a_size+1:prim_sep.N*2],width=0.1,alpha=0.5,color="yellow",label="mu(a,s=0.05,h=1)")
+title("Distribution - Separating (Unemployed/Bankruptcy)")
+legend(loc="upper right")
+savefig("C:/Users/j0el/Documents/Wisconsin/899/Problem Sets/PS4b/Pictures/distunemp1_sep.pgf")
