@@ -102,63 +102,83 @@ tic()
 results = compute_pooling(max_iter=100,a_size=500)
 toc()
 
-pooling_prim = results[3]
-pooling_results = results[4]
+prim_pool = results[3]
+results_pool = results[4]
 
 #= Since policy functions are not defined over default regions
 need to trim index arrays and only return non-default policies. Also need to
 construct matching asset values for plotting =#
 
-policyindex_emp1_pool = pooling_results.sigma1[:,1][pooling_results.sigma1[:,1].!=0]
-  a_vals_policy_emp1_pool = pooling_prim.a_vals[pooling_results.sigma1[:,1].!=0]
-policyindex_unemp1_pool = pooling_results.sigma1[:,2][pooling_results.sigma1[:,2].!=0]
-  a_vals_policy_unemp1_pool = pooling_prim.a_vals[pooling_results.sigma1[:,2].!=0]
+policyindex_emp1_pool = results_pool.sigma1[:,1][results_pool.sigma1[:,1].!=0]
+  a_vals_policy_emp1_pool = prim_pool.a_vals[results_pool.sigma1[:,1].!=0]
+policyindex_unemp1_pool = results_pool.sigma1[:,2][results_pool.sigma1[:,2].!=0]
+  a_vals_policy_unemp1_pool = prim_pool.a_vals[results_pool.sigma1[:,2].!=0]
 
 # Return values for policy functions and no-bankrupt value functions
 
-policy_emp0_pool = pooling_prim.a_vals[pooling_results.sigma0[:,1]]
-policy_unemp0_pool = pooling_prim.a_vals[pooling_results.sigma0[:,2]]
-policy_emp1_pool = pooling_prim.a_vals[policyindex_emp1_pool]
-policy_unemp1_pool = pooling_prim.a_vals[policyindex_unemp1_pool]
-value_emp0_pool = pooling_results.Tv0[:,1]
-value_unemp0_pool = pooling_results.Tv0[:,2]
+policy_emp0_pool = prim_pool.a_vals[results_pool.sigma0[:,1]]
+policy_unemp0_pool = prim_pool.a_vals[results_pool.sigma0[:,2]]
+policy_emp1_pool = prim_pool.a_vals[policyindex_emp1_pool]
+policy_unemp1_pool = prim_pool.a_vals[policyindex_unemp1_pool]
+value_emp0_pool = results_pool.Tv0[:,1]
+value_unemp0_pool = results_pool.Tv0[:,2]
 
 #= Value functions only defined for bankrupt histories over positive assets.
 Trim value function arrays and construct corresponding asset values =#
 
-value_emp1_pool = pooling_results.Tv1[:,1][pooling_results.Tv1[:,1].!=-Inf]
-  a_vals_value_emp1_pool = pooling_prim.a_vals[pooling_results.Tv1[:,1].!=-Inf]
-value_unemp1_pool = pooling_results.Tv1[:,2][pooling_results.Tv1[:,2].!=-Inf]
-  a_vals_value_unemp1_pool = pooling_prim.a_vals[pooling_results.Tv1[:,2].!=-Inf]
+value_emp1_pool = results_pool.Tv1[:,1][results_pool.Tv1[:,1].!=-Inf]
+  a_vals_value_emp1_pool = prim_pool.a_vals[results_pool.Tv1[:,1].!=-Inf]
+value_unemp1_pool = results_pool.Tv1[:,2][results_pool.Tv1[:,2].!=-Inf]
+  a_vals_value_unemp1_pool = prim_pool.a_vals[results_pool.Tv1[:,2].!=-Inf]
 
 # Plot value functions
 
-valfig = figure()
-plot(pooling_prim.a_vals,value_emp0_pool,color="blue",linewidth=2.0,label="Employed (h=0)")
-plot(pooling_prim.a_vals,value_unemp0_pool,color="red",linewidth=2.0,label="Unemployed (h=0)")
+valfig0 = figure()
+plot(prim_pool.a_vals,value_emp0_pool,color="blue",linewidth=2.0,label="Employed (h=0)")
+plot(prim_pool.a_vals,value_unemp0_pool,color="red",linewidth=2.0,label="Unemployed (h=0)")
+xlabel("a")
+ylabel("v(a,s,h)")
+legend(loc="lower right")
+title("Value Functions (Pooling - No Bankruptcy)")
+ax = PyPlot.gca()
+ax[:set_ylim]((-20,2))
+savefig("C:/Users/j0el/Documents/Wisconsin/899/Problem Sets/PS4b/Pictures/valuefunctions0_pool.pgf")
+
+valfig1 = figure()
 plot(a_vals_value_emp1_pool,value_emp1_pool,color="green",linewidth=2.0,label="Employed (h=1)")
 plot(a_vals_value_unemp1_pool,value_unemp1_pool,color="yellow",linewidth=2.0,label="Unemployed (h=1)")
 xlabel("a")
 ylabel("v(a,s,h)")
 legend(loc="lower right")
-title("Value Functions (Pooling)")
+title("Value Functions (Pooling - Bankruptcy)")
 ax = PyPlot.gca()
 ax[:set_ylim]((-20,2))
-#savefig("C:/Users/j0el/Documents/Wisconsin/899/Problem Sets/PS4b/Pictures/valuefunctions_pool.pgf")
+savefig("C:/Users/j0el/Documents/Wisconsin/899/Problem Sets/PS4b/Pictures/valuefunctions1_pool.pgf")
 
 # Plot value function
 
-polfig = figure()
-plot(pooling_prim.a_vals,policy_emp0_pool,color="blue",linewidth=2.0,label="Employed (h=0)")
-plot(pooling_prim.a_vals,policy_unemp0_pool,color="red",linewidth=2.0,label="Unemployed (h=0)")
-plot(a_vals_policy_emp1_pool,policy_emp1_pool,color="green",linewidth=2.0,label="Employed (h=1)")
-plot(a_vals_policy_unemp1_pool,policy_unemp1_pool,color="yellow",linewidth=2.0,label="Unemployed (h=1)")
-plot(pooling_prim.a_vals,pooling_prim.a_vals,color="black",linewidth=1.0)
+polfig0 = figure()
+plot(prim_pool.a_vals,policy_emp0_pool,color="blue",linewidth=2.0,label="Employed (h=0)")
+plot(prim_pool.a_vals,policy_unemp0_pool,color="red",linewidth=2.0,label="Unemployed (h=0)")
+plot(prim_pool.a_vals,prim_pool.a_vals,color="black",linewidth=1.0)
 xlabel("a")
 ylabel("g(a,s,h)")
 legend(loc="lower right")
-title("Policy Functions (Pooling)")
+title("Policy Functions (Pooling - No Bankruptcy)")
 ax = PyPlot.gca()
 ax[:set_ylim]((-1,5))
 ax[:set_xlim]((-0.525,5))
-#savefig("C:/Users/j0el/Documents/Wisconsin/899/Problem Sets/PS4b/Pictures/policyfunctions_pool.pgf")
+savefig("C:/Users/j0el/Documents/Wisconsin/899/Problem Sets/PS4b/Pictures/policyfunctions0_pool.pgf")
+
+polfig1 = figure()
+plot(a_vals_policy_emp1_pool,policy_emp1_pool,color="green",linewidth=2.0,label="Employed (h=1)")
+plot(a_vals_policy_unemp1_pool,policy_unemp1_pool,color="yellow",linewidth=2.0,label="Unemployed (h=1)")
+plot(a_vals_policy_emp1_pool,a_vals_policy_emp1_pool,color="black",linewidth=1.0)
+xlabel("a")
+ylabel("g(a,s,h)")
+legend(loc="lower right")
+title("Policy Functions (Pooling - Bankruptcy)")
+ax = PyPlot.gca()
+ax[:set_ylim]((-1,5))
+ax[:set_xlim]((0,5))
+savefig("C:/Users/j0el/Documents/Wisconsin/899/Problem Sets/PS4b/Pictures/policyfunctions1_pool.pgf")
