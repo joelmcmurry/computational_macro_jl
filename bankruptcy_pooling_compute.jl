@@ -14,8 +14,7 @@ function compute_pooling(;q0=0.01,max_iter=100,epsilon=1e-4,
   epsilon_vfi=1e-4,epsilon_statdist=1e-4,
   a_size=500)
 
-  ## Starting range for pooling discount bond price
-
+  # Starting range for pooling discount bond price
   qlower = q0
   qupper = 1
 
@@ -100,7 +99,7 @@ profits_pool, q_pool, prim, results
 end
 
 tic()
-results = compute_pooling(max_iter=100,a_size=2000)
+results = compute_pooling(max_iter=100,a_size=500)
 toc()
 
 pooling_prim = results[3]
@@ -145,7 +144,7 @@ legend(loc="lower right")
 title("Value Functions (Pooling)")
 ax = PyPlot.gca()
 ax[:set_ylim]((-20,2))
-savefig("C:/Users/j0el/Documents/Wisconsin/899/Problem Sets/PS4b/Pictures/valuefunctions_pool.pgf")
+#savefig("C:/Users/j0el/Documents/Wisconsin/899/Problem Sets/PS4b/Pictures/valuefunctions_pool.pgf")
 
 # Plot value function
 
@@ -162,4 +161,4 @@ title("Policy Functions (Pooling)")
 ax = PyPlot.gca()
 ax[:set_ylim]((-1,5))
 ax[:set_xlim]((-0.525,5))
-savefig("C:/Users/j0el/Documents/Wisconsin/899/Problem Sets/PS4b/Pictures/policyfunctions_pool.pgf")
+#savefig("C:/Users/j0el/Documents/Wisconsin/899/Problem Sets/PS4b/Pictures/policyfunctions_pool.pgf")

@@ -13,10 +13,11 @@ type Primitives
   r :: Float64 ## risk free interest rate
   q_pool :: Float64 ## discount bond price pooling
   q_menu :: Array{Float64,2} ## menu of discount bond prices for separating
+  q_menu_seed :: Float64 ## seed value for separating menu
   rho :: Float64 ## legal record keeping tech parameter
   a_min :: Float64 ## minimum asset value
   a_max :: Float64 ## maximum asset value
-  a_min_sep :: Array{Float64,2} ## separating contract borrowing constraints
+  a_min_sep :: Array{Float64,1} ## separating contract borrowing constraints
   a_size :: Int64 ## size of asset grid
   a_vals :: Vector{Float64} ## asset grid
   a_indices :: Array{Int64} ## indices of choices
@@ -32,9 +33,10 @@ end
 ## Outer Constructor for Primitives
 
 function Primitives(;beta::Float64=0.8, alpha::Float64=1.5,
-  r::Float64=0.04, q_pool::Float64=0.5, rho::Float64=0.9,
-  a_min::Float64=-0.525, a_max::Float64=5.0, a_size::Int64=100,
-  markov=[0.75 (1-0.75);(1-0.75) 0.75], s_vals = [1, 0.05])
+  r::Float64=0.04, q_pool::Float64=0.5, q_menu_seed::Float64=0.5,
+  rho::Float64=0.9, a_min::Float64=-0.525, a_max::Float64=5.0,
+  a_size::Int64=100, markov=[0.75 (1-0.75);(1-0.75) 0.75],
+  s_vals = [1, 0.05])
 
   # Asset grize side must be even
 
@@ -52,11 +54,11 @@ function Primitives(;beta::Float64=0.8, alpha::Float64=1.5,
   N = a_size*s_size
   a_s_vals = gridmake(a_vals,s_vals)
   a_s_indices = gridmake(1:a_size,1:s_size)
-  q_menu = ones(a_size,s_size)*q_pool
-  a_min_sep = ones(prim.s_size)*a_min
+  q_menu = ones(a_size,s_size)*q_menu_seed
+  a_min_sep = ones(Float64,s_size)*a_min
 
-  primitives = Primitives(beta, alpha, r, q_pool, q_menu, rho, a_min,
-  a_max, a_min_sep, a_size, a_vals, a_indices, s_size,
+  primitives = Primitives(beta, alpha, r, q_pool, q_menu, q_menu_seed,
+  rho, a_min, a_max, a_min_sep, a_size, a_vals, a_indices, s_size,
   s_vals, markov, a_s_vals, a_s_indices, N, zero_index)
 
   return primitives
@@ -289,11 +291,10 @@ function bellman_clean_sep!(prim::Primitives, v0::Array{Float64,2},
         max_value = -Inf # initialize value for (a,s) combinations
 
         for choice_index in choice_lower:prim.a_size
+          aprime = prim.a_vals[choice_index]
 
           # check if asset choice is above borrowing constraints
-          if choice_index >= prim.a_min_sep[state_index]
-
-          aprime = prim.a_vals[choice_index]
+          if aprime >= prim.a_min_sep[state_index]
 
             # saving and borrowing at different rates
             if aprime <= 0.00 # borrow at market raets

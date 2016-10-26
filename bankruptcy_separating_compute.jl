@@ -14,20 +14,22 @@ function compute_separating(;q0=0.01,max_iter=100,epsilon=1e-4,
   epsilon_vfi=1e-4,epsilon_statdist=1e-4,
   a_size=500)
 
-  ## Starting range for pooling discount bond price
-
-  qlower = q0*ones(prim.a_size,prim.s_size)
-  qupper = ones(prim.a_size,prim.s_size)
-
   # Initialize primitives
-  prim = Primitives(q_pool=q0/2,a_size=a_size)
+  prim = Primitives(a_size=a_size)
+
+  # Starting range for pooling discount bond price
+  qlower = q0*ones(Float64,prim.a_size,prim.s_size)
+  qupper = ones(Float64,prim.a_size,prim.s_size)
+
+  q_menu = (qlower+qupper)./2
+  prim.q_menu = q_menu
 
   # Initial guess for value functions
   v0 = zeros(prim.a_size,prim.s_size)
   v1 = zeros(prim.a_size,prim.s_size)
 
   # Initialize lender profits
-  profits_sep = ones(prim.a_size,prim.s_size)*10.0
+  profits_sep = ones(Float64,prim.a_size,prim.s_size)*10.0
 
   # Initialize results structure
   results = Results(prim,v0,v1)
@@ -55,15 +57,20 @@ function compute_separating(;q0=0.01,max_iter=100,epsilon=1e-4,
       end
     end
 
-    zero_profit_target = 1/(1+prim.r)*ones(Float64,prim.a_size,prim.s_size)-delta_sep./(1+prim.r)
+    zero_profit_target = 1/(1+prim.r)*ones(Float64,prim.a_size,prim.s_size) - delta_sep./(1+prim.r)
 
     # Calculate implicit borrowing constraints
     for state_today in 1:prim.s_size
-      prim.a_min_sep[state_today] =
-        maximum(find(zero_profit_target[:,state_today].==0.0))
+      if isempty(find(zero_profit_target[:,state_today].==0.0)) == false
+        prim.a_min_sep[state_today] =
+          prim.a_vals[maximum(find(zero_profit_target[:,state_today].==0.0))]
+      else
+        prim.a_min_sep[state_today] =
+          prim.a_vals[minimum(find(zero_profit_target[:,state_today].>0.0))]
+      end
     end
 
-    profits_sep = prim.q_menu- zero_profit_target
+    profits_sep = prim.q_menu - zero_profit_target
 
     # Print iteration, net assets, and discount bond price
     println("Iter: ", i, " Max Profits: ", maximum(abs(profits_sep)))
@@ -86,7 +93,8 @@ function compute_separating(;q0=0.01,max_iter=100,epsilon=1e-4,
     end
 
     # Update primitives given new q menu
-    prim.q_menu = (qlower + qupper)./2
+    q_menu = (qlower + qupper)./2
+    prim.q_menu = q_menu
 
     # Update guess for value function
     v0 = results.Tv0
@@ -99,7 +107,7 @@ profits_sep, q_menu, prim, results
 end
 
 tic()
-results = compute_sep(max_iter=100,a_size=2000)
+results = compute_separating(max_iter=100,a_size=500)
 toc()
 
 sep_prim = results[3]
