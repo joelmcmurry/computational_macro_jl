@@ -102,33 +102,19 @@ tic()
 pooling_eq = compute_pooling(max_iter=100,a_size=500)
 toc()
 
+profits_pool = pooling_eq[1]
+q_pool = pooling_eq[2]
 prim_pool = pooling_eq[3]
 results_pool = pooling_eq[4]
 
-## Calculate debt-to-income rate
+#= Collapse stationary distribution over all state/histories
+to stationary distribution over assets. For each asset level there
+are four possible (s,h) combinations =#
 
-  #= Collapse stationary distribution over all state/histories
-  to stationary distribution over assets. For each asset level there
-  are four possible (s,h) combinations =#
-
-  statdist_assets_pool = results_pool.statdist[1:prim_pool.a_size] +
-    results_pool.statdist[prim_pool.a_size+1:2*prim_pool.a_size] +
-    results_pool.statdist[2*prim_pool.a_size+1:3*prim_pool.a_size] +
-    results_pool.statdist[3*prim_pool.a_size+1:4*prim_pool.a_size]
-
-  debt_pool = dot(prim_pool.a_vals[1:prim_pool.zero_index],
-    statdist_assets_pool[1:prim_pool.zero_index])
-
-  # Total income is average of earnings values since half the population is each
-
-  income_pool = sum(prim_pool.s_vals)/2
-
-  debt_to_income_pool = debt_pool/income_pool
-
-## Calculate economywide default rate (recall only no-bankrupt history can default)
-
-  default_rate_pool = dot(results_pool.statdist[1:prim_pool.N],
-    vcat(results_pool.d0[:,1],results_pool.d0[:,2]))
+statdist_assets_pool = results_pool.statdist[1:prim_pool.a_size] +
+  results_pool.statdist[prim_pool.a_size+1:prim_pool.N] +
+  results_pool.statdist[prim_pool.N+1:prim_pool.N+prim_pool.a_size] +
+  results_pool.statdist[prim_pool.N+prim_pool.a_size+1:2*prim_pool.N]
 
 #= Output Moments =#
 
@@ -137,11 +123,69 @@ results_pool = pooling_eq[4]
   avg_inc_pool = sum(prim_pool.s_vals[1]*(results_pool.statdist[1:prim_pool.a_size]+
     results_pool.statdist[prim_pool.N+1:prim_pool.N+prim_pool.a_size])) +
     sum(prim_pool.s_vals[2]*(results_pool.statdist[prim_pool.a_size+1:prim_pool.N]+
-      results_pool.statdist[prim_pool.N+prim_pool.a_size+1:prim_pool.N*2]))
+      results_pool.statdist[prim_pool.N+prim_pool.a_size+1:2*prim_pool.N]))
 
   # Savings
-  
-  avg_savings_pool =
+
+  avg_savings_pool = dot(statdist_assets_pool[prim_pool.zero_index:prim_pool.a_size],
+    prim_pool.a_vals[prim_pool.zero_index:prim_pool.a_size])
+
+  # Debt
+
+  avg_debt_pool = dot(statdist_assets_pool[1:prim_pool.zero_index],
+    prim_pool.a_vals[1:prim_pool.zero_index])
+
+  # Default amount
+
+  default_debt_pool = dot(prim_pool.a_vals,
+    results_pool.statdist[prim_pool.a_size+1:prim_pool.N].*results_pool.d0[:,2])
+
+  # Default rate (fraction of debt holders that default)
+
+  default_rate_pool = dot(results_pool.statdist[1:prim_pool.zero_index],
+    results_pool.d0[1:prim_pool.zero_index,1]) +
+    dot(results_pool.statdist[prim_pool.a_size+1:prim_pool.a_size+prim_pool.zero_index],
+    results_pool.d0[1:prim_pool.zero_index,2])
+
+  # Debt-to-Income
+
+  debt_to_income_pool = avg_debt_pool/avg_inc_pool
+
+  summary_pool = [debt_to_income_pool, avg_inc_pool, avg_savings_pool, avg_debt_pool,
+    default_rate_pool, default_debt_pool, q_pool]
+
+## Consumption Equivalent
+
+# Generate separating equilibrium
+include("bankruptcy_separating_compute.jl")
+
+  # Calculate consumption equivalent (pooling to separating) for each history
+
+  if prim_pool.a_size == prim_sep.a_size
+
+    lambda0 = ((results_sep.Tv0 + (1/((1-prim_pool.alpha)*(1-prim_pool.beta)))).^(1/(1-prim_pool.alpha))).*
+      ((results_pool.Tv0 .+ (1/((1-prim_pool.alpha)*(1-prim_pool.beta)))).^(1/(prim_pool.alpha-1))).-1
+
+    lambda1 = ((results_sep.Tv1 + (1/((1-prim_pool.alpha)*(1-prim_pool.beta)))).^(1/(1-prim_pool.alpha))).*
+      ((results_pool.Tv1 .+ (1/((1-prim_pool.alpha)*(1-prim_pool.beta)))).^(1/(prim_pool.alpha-1))).-1
+
+  else
+    msg = "Asset grid sizes must match between pooling and separating models"
+    throw(ArgumentError(msg))
+  end
+
+  lambda_emp = lambda[:,1]
+  lambda_unemp = lambda[:,2]
+
+  # Calculate welfare gain
+  WG = dot(huggett_results.statdist[1:huggett.a_size],lambda_emp)+
+    dot(huggett_results.statdist[huggett.a_size+1:huggett.N],lambda_unemp)
+
+  # Calculate fraction of population in favor of switching to complete markets
+
+  frac_switch = dot(lambda_emp.>=0,huggett_results.statdist[1:huggett.a_size])+
+    dot(lambda_unemp.>=0,huggett_results.statdist[huggett.a_size+1:huggett.N])
+
 
 #= Graphs =#
 
@@ -279,3 +323,27 @@ PyPlot.bar(prim_pool.a_vals,results_pool.statdist[prim_pool.N+prim_pool.a_size+1
 title("Distribution - Pooling (Unemployed/Bankruptcy)")
 legend(loc="upper right")
 savefig("C:/Users/j0el/Documents/Wisconsin/899/Problem Sets/PS4b/Pictures/distunemp1_pool.pgf")
+
+# Consumption Equivalents
+
+conseq0 = figure()
+plot(prim_pool.a_vals,lambda0[:,1],color="blue",linewidth=2.0,label="Employed (h=0)")
+plot(prim_pool.a_vals,lambda0[:,2],color="red",linewidth=2.0,label="Unemployed (h=0)")
+xlabel("a")
+legend(loc="lower right")
+title("Consumption Equivalents (h=0)")
+ax = PyPlot.gca()
+ax[:set_ylim]((0,0.1))
+ax[:set_xlim]((-0.525,5))
+savefig("C:/Users/j0el/Documents/Wisconsin/899/Problem Sets/PS4b/Pictures/consequiv0.pgf")
+
+conseq1 = figure()
+plot(prim_pool.a_vals,lambda1[:,1],color="green",linewidth=2.0,label="Employed (h=1)")
+plot(prim_pool.a_vals,lambda1[:,2],color="yellow",linewidth=2.0,label="Unemployed (h=1)")
+xlabel("a")
+legend(loc="lower right")
+title("Consumption Equivalents (h=1)")
+ax = PyPlot.gca()
+ax[:set_ylim]((0,0.02))
+ax[:set_xlim]((-0.525,5))
+savefig("C:/Users/j0el/Documents/Wisconsin/899/Problem Sets/PS4b/Pictures/consequiv1.pgf")

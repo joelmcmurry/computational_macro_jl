@@ -111,30 +111,70 @@ q_menu = separating_eq[2]
 prim_sep = separating_eq[3]
 results_sep = separating_eq[4]
 
-## Calculate debt-to-income rate
+#= Collapse stationary distribution over all state/histories
+to stationary distribution over assets. For each asset level there
+are four possible (s,h) combinations =#
 
-  #= Collapse stationary distribution over all state/histories
-  to stationary distribution over assets. For each asset level there
-  are four possible (s,h) combinations =#
+statdist_assets_sep = results_sep.statdist[1:prim_sep.a_size] +
+  results_sep.statdist[prim_sep.a_size+1:prim_sep.N] +
+  results_sep.statdist[prim_sep.N+1:prim_sep.N+prim_sep.a_size] +
+  results_sep.statdist[prim_sep.N+prim_sep.a_size+1:2*prim_sep.N]
 
-  statdist_assets_sep = results_sep.statdist[1:prim_sep.a_size] +
-    results_sep.statdist[prim_sep.a_size+1:2*prim_sep.a_size] +
-    results_sep.statdist[2*prim_sep.a_size+1:3*prim_sep.a_size] +
-    results_sep.statdist[3*prim_sep.a_size+1:4*prim_sep.a_size]
+#= Output Moments =#
 
-  debt_sep = dot(prim_sep.a_vals[1:prim_sep.zero_index],
-    statdist_assets_sep[1:prim_sep.zero_index])
+  # Income
 
-  # Total income is average of earnings values since half the population is each
+  avg_inc_sep = sum(prim_sep.s_vals[1]*(results_sep.statdist[1:prim_sep.a_size]+
+    results_sep.statdist[prim_sep.N+1:prim_sep.N+prim_sep.a_size])) +
+    sum(prim_sep.s_vals[2]*(results_sep.statdist[prim_sep.a_size+1:prim_sep.N]+
+      results_sep.statdist[prim_sep.N+prim_sep.a_size+1:2*prim_sep.N]))
 
-  income_sep = sum(prim_sep.s_vals)/2
+  # Savings
 
-  debt_to_income_sep = debt_sep/income_sep
+  avg_savings_sep = dot(statdist_assets_sep[prim_sep.zero_index:prim_sep.a_size],
+    prim_sep.a_vals[prim_sep.zero_index:prim_sep.a_size])
 
-## Calculate economywide default rate (recall only no-bankrupt history can default)
+  # Debt
 
-  default_rate_sep = dot(results_sep.statdist[1:prim_sep.N],
-    vcat(results_sep.d0[:,1],results_sep.d0[:,2]))
+  avg_debt_sep = dot(statdist_assets_sep[1:prim_sep.zero_index],
+    prim_sep.a_vals[1:prim_sep.zero_index])
+
+  # Default amount
+
+  default_debt_sep = dot(prim_sep.a_vals,
+    results_sep.statdist[prim_sep.a_size+1:prim_sep.N].*results_sep.d0[:,2])
+
+  # Default rate (fraction of debt holders that default)
+
+  default_rate_sep = dot(results_sep.statdist[1:prim_sep.zero_index],
+    results_sep.d0[1:prim_sep.zero_index,1]) +
+    dot(results_sep.statdist[prim_sep.a_size+1:prim_sep.a_size+prim_sep.zero_index],
+    results_sep.d0[1:prim_sep.zero_index,2])
+
+  # Average bond price (only for borrowers)
+
+  weighted_sum_borrow = 0.0
+  mass_borrow = 0.0
+
+  for state_today in 1:prim_sep.s_size
+    for asset_today in 1:prim_sep.a_size
+      if results_sep.sigma0[asset_today,state_today] < prim_sep.zero_index
+        weighted_sum_borrow += q_menu[results_sep.sigma0[asset_today,state_today],
+          state_today]*results_sep.statdist[asset_today+(state_today-1)*
+          prim_sep.a_size]
+        mass_borrow += results_sep.statdist[asset_today+(state_today-1)*
+        prim_sep.a_size]
+      end
+    end
+  end
+  avg_q_sep = weighted_sum_borrow/mass_borrow
+
+  # Debt-to-Income
+
+  debt_to_income_sep = avg_debt_sep/avg_inc_sep
+
+  summary_sep = [debt_to_income_sep, avg_inc_sep, avg_savings_sep, avg_debt_sep,
+    default_rate_sep, default_debt_sep, avg_q_sep]
 
 ## Calculate interest rate menu implied by bond prices
 
