@@ -169,7 +169,7 @@ function bellman_defaulted!(prim::Primitives, v0::Array{Float64,2},
               prim.beta*dot(prim.markov[state_index,:],
               (prim.rho*v1[choice_index,:]+
               (1-prim.rho)*v0[choice_index,:]))
-              if value > max_value
+              if value >= max_value
                 max_value = value
                 sigma1[asset_index,state_index] = choice_index
                 choice_lower = choice_index
@@ -233,7 +233,7 @@ function bellman_clean_pool!(prim::Primitives, v0::Array{Float64,2},
           if c > 0.00
             value = (1/(1-prim.alpha))*(1/(c^(prim.alpha-1))-1) +
             prim.beta*dot(prim.markov[state_index,:],v0[choice_index,:])
-            if value > max_value
+            if value >= max_value
               max_value = value
               sigma0[asset_index,state_index] = choice_index
               choice_lower = choice_index
@@ -306,7 +306,7 @@ function bellman_clean_sep!(prim::Primitives, v0::Array{Float64,2},
             if c > 0.00
               value = (1/(1-prim.alpha))*(1/(c^(prim.alpha-1))-1) +
               prim.beta*dot(prim.markov[state_index,:],v0[choice_index,:])
-              if value > max_value
+              if value >= max_value
                 max_value = value
                 sigma0[asset_index,state_index] = choice_index
                 choice_lower = choice_index

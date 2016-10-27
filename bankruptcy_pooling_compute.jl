@@ -98,14 +98,14 @@ profits_pool, q_pool, prim, results
 
 end
 
-tic()
-pooling_eq = compute_pooling(max_iter=100,a_size=500)
-toc()
+  tic()
+  pooling_eq = compute_pooling(max_iter=100,a_size=2000)
+  toc()
 
-profits_pool = pooling_eq[1]
-q_pool = pooling_eq[2]
-prim_pool = pooling_eq[3]
-results_pool = pooling_eq[4]
+  profits_pool = pooling_eq[1]
+  q_pool = pooling_eq[2]
+  prim_pool = pooling_eq[3]
+  results_pool = pooling_eq[4]
 
 #= Collapse stationary distribution over all state/histories
 to stationary distribution over assets. For each asset level there
@@ -173,19 +173,6 @@ include("bankruptcy_separating_compute.jl")
     msg = "Asset grid sizes must match between pooling and separating models"
     throw(ArgumentError(msg))
   end
-
-  lambda_emp = lambda[:,1]
-  lambda_unemp = lambda[:,2]
-
-  # Calculate welfare gain
-  WG = dot(huggett_results.statdist[1:huggett.a_size],lambda_emp)+
-    dot(huggett_results.statdist[huggett.a_size+1:huggett.N],lambda_unemp)
-
-  # Calculate fraction of population in favor of switching to complete markets
-
-  frac_switch = dot(lambda_emp.>=0,huggett_results.statdist[1:huggett.a_size])+
-    dot(lambda_unemp.>=0,huggett_results.statdist[huggett.a_size+1:huggett.N])
-
 
 #= Graphs =#
 

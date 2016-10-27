@@ -103,7 +103,7 @@ profits_sep, q_menu, prim, results
 end
 
 tic()
-separating_eq = compute_separating(max_iter=100,a_size=500)
+separating_eq = compute_separating(max_iter=100,a_size=2000)
 toc()
 
 profits_sep = separating_eq[1]
