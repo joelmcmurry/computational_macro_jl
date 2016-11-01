@@ -80,7 +80,7 @@ end
 function bellman_retired!(prim::Primitives, v::Array{Float64,1})
   # initialize
   Tv = fill(-Inf,prim.a_size)
-  policy = zeros(prim.a_size)
+  policy = zeros(Int64,prim.a_size)
 
   #= exploit monotonicity of policy function and only look for
   asset choices above the choice for previous asset level =#
@@ -97,17 +97,17 @@ function bellman_retired!(prim::Primitives, v::Array{Float64,1})
       for choice_index in choice_lower:prim.a_size
         aprime = prim.a_vals[choice_index]
         c = (1+prim.r)*a + prim.b - aprime
-        if c > 0
+        if c > 0.00
           value = (1/(1-prim.sigma))*(c^((1-prim.sigma)*prim.gamma)) +
           prim.beta*v[choice_index]
           if value > max_value
             max_value = value
-            policy[asset_index,state_index] = choice_index
+            policy[asset_index] = choice_index
             choice_lower = choice_index
           end
         end
       end
-    Tv[asset_index,state_index] = max_value
+    Tv[asset_index] = max_value
   end
   Tv, policy
 end
@@ -118,6 +118,10 @@ function bellman_working!(prim::Primitives, v::Array{Float64,2}, age::Int64)
   # initialize output
   Tv = fill(-Inf,(prim.a_size,prim.z_size))
   policy = zeros(Int64,prim.a_size,prim.z_size)
+  labor = zeros(Float64,prim.a_size,prim.z_size)
+
+  testc = zeros(Float64,prim.a_size,prim.z_size)
+  testv = zeros(Float64,prim.a_size,prim.z_size)
 
   # pull in age-efficiency value
 
@@ -140,24 +144,30 @@ function bellman_working!(prim::Primitives, v::Array{Float64,2}, age::Int64)
         # calculate optimal labor supply for choice of aprime
         l = (prim.gamma*(1-prim.theta)*prim.ageeff[age]*z*prim.w -
           (1-prim.gamma)*((1+prim.r)*a-aprime))*
-          (((1-prim.theta)*w*prim.ageeff[age])^(-1))
-
-        c = s + a - (1/(1+prim.r))*aprime
+          (1/((1-prim.theta)*prim.w*prim.ageeff[age]))
+        if l < 0.00
+          l = 0.00
+        elseif l > 1.00
+          l = 1.00
+        end
+        c = prim.w*(1-prim.theta)*prim.ageeff[age]*l + (1+prim.r)*a - aprime
         if c > 0.00
-          value = (1/(1-prim.alpha))*(1/(c^(prim.alpha-1))-1) +
-          prim.beta*dot(prim.markov[state_index,:],
-          (prim.rho*v1[choice_index,:]+
-          (1-prim.rho)*v0[choice_index,:]))
+          value = (1/(1-prim.sigma))*((c^prim.gamma*(1.00-l)^(1.00-prim.gamma))
+          ^(1.00-prim.sigma)) + prim.beta*
+          dot(prim.z_markov[z_index,:],v[choice_index,:])
           if value >= max_value
             max_value = value
-            sigma1[asset_index,state_index] = choice_index
+            policy[asset_index,z_index] = choice_index
+            labor[asset_index,z_index] = l
             choice_lower = choice_index
+            testc[asset_index,z_index] = c
+            testv[asset_index,z_index] = value
           end
         end
-
       end
-    Tv1[asset_index,state_index] = max_value
+    Tv[asset_index,z_index] = max_value
     end
   end
-  Tv1, sigma1
+  Tv, policy, labor, testc, testv
 end
+testbell = bellman_working!(prim,v,age)
