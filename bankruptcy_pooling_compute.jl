@@ -98,14 +98,14 @@ profits_pool, q_pool, prim, results
 
 end
 
-  tic()
-  pooling_eq = compute_pooling(max_iter=100,a_size=2000)
-  toc()
+tic()
+pooling_eq = compute_pooling(max_iter=100,a_size=500)
+toc()
 
-  profits_pool = pooling_eq[1]
-  q_pool = pooling_eq[2]
-  prim_pool = pooling_eq[3]
-  results_pool = pooling_eq[4]
+profits_pool = pooling_eq[1]
+q_pool = pooling_eq[2]
+prim_pool = pooling_eq[3]
+results_pool = pooling_eq[4]
 
 #= Collapse stationary distribution over all state/histories
 to stationary distribution over assets. For each asset level there
