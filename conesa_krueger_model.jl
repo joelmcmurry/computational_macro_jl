@@ -26,35 +26,42 @@ type Primitives
   a_vals :: Vector{Float64} ## asset grid
   a_indices :: Array{Int64} ## indices of choices
   z_size :: Int64 ## number of idiosyncratic shock values
-  z_vals:: Array{Float64,1} ## values of idiosyncratic shock values
-  z_markov :: Array{Float64,2} ## Markov process for idiosyncratic shock values
-  z_ergodic :: Array{Float64,2} ## ergodic distribution for idiosyncratic shock values
+  z_vals:: Array{Float64} ## values of idiosyncratic shock values
+  z_markov :: Array{Float64} ## Markov process for idiosyncratic shock values
+  z_ergodic :: Array{Float64} ## ergodic distribution for idiosyncratic shock values
   a_z_vals :: Array{Float64} ## array of states: (a,z) combinations
   a_z_indices :: Array{Int64} ## indices of states: (a,z) combinations
   M :: Int64 ## number of possible (a,z) combination
+  ageeff :: Array{Float64} ## age efficiency profile
 end
 
 #= Outer Constructor for Primitives. Supplies default values, field
 names, and creates grid objects=#
 
 function Primitives(;N::Int64=66,JR::Int64=46,n::Float64=0.011,beta::Float64=0.97,
-  gamma::Float64=0.42,sigma::Float64=2,delta::Float64=0.06,alpha::Float64=0.36,
-  w::Float64=1.05,r::Float64=0.05,b::Float64=0.2,theta::Float64=0.11,a_min::Float64=0.0,
-  a_max::Float64=5.0,a_size::Int64=100,z_vals=[3.0;0.5],
-  z_markov=[0.9261 (1-0.9261);(1-0.9811) 0.9811],z_ergodic=[0.2037 1-0.2037])
+  gamma::Float64=0.42,sigma::Float64=2.0,delta::Float64=0.06,alpha::Float64=0.36,
+  w::Float64=1.05,r::Float64=0.05,b::Float64=0.2,theta::Float64=0.11,
+  a_min::Float64=0.0,a_max::Float64=5.0,a_size::Int64=100,z_vals=[3.0, 0.5],
+  z_markov=[0.9261 (1-0.9261);(1-0.9811) 0.9811],z_ergodic=[0.2037 (1-0.2037)])
 
   # Grids
 
   a_vals = linspace(a_min, a_max, a_size)
-  z_size = length(markov[:,1])
+  z_size = length(z_markov[:,1])
   a_indices = gridmake(1:a_size)
   M = a_size*z_size
   a_z_vals = gridmake(a_vals,z_vals)
   a_z_indices = gridmake(1:a_size,1:z_size)
 
+  # Import age-efficiency profile file
+
+  ageeff_file = open("ageeff.txt")
+  ageeff = readdlm(ageeff_file)
+  close(ageeff_file)
+
   primitives = Primitives(N, JR, n, beta, gamma, sigma, delta, alpha, w, r, b,
-    theta, a_min, a_max, a_size, a_vals, z_size, z_vals, z_markov, z_ergodic, a_z_vals,
-    a_z_indices, M)
+    theta, a_min, a_max, a_size, a_vals, a_indices, z_size, z_vals, z_markov,
+    z_ergodic, a_z_vals, a_z_indices, M, ageeff)
 
   return primitives
 
@@ -131,8 +138,9 @@ function bellman_working!(prim::Primitives, v::Array{Float64,2}, age::Int64)
       for choice_index in choice_lower:prim.a_size
         aprime = prim.a_vals[choice_index]
         # calculate optimal labor supply for choice of aprime
-        l = (prim.gamma*(1-prim.theta)*z*prim.w - (1-prim.gamma)*((1+prim.r)*a-aprime))*
-          (((1-prim.theta)*w*z)^(-1))
+        l = (prim.gamma*(1-prim.theta)*prim.ageeff[age]*z*prim.w -
+          (1-prim.gamma)*((1+prim.r)*a-aprime))*
+          (((1-prim.theta)*w*prim.ageeff[age])^(-1))
 
         c = s + a - (1/(1+prim.r))*aprime
         if c > 0.00
