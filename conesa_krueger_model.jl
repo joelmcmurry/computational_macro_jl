@@ -59,3 +59,97 @@ function Primitives(;N::Int64=66,JR::Int64=46,n::Float64=0.011,beta::Float64=0.9
   return primitives
 
 end
+
+## Type Results which holds results of the problem HERE
+
+## Solve Discrete Dynamic Program HERE
+
+#= Internal Utilities =#
+
+## Bellman Operators
+
+# Operator for retired agent
+
+function bellman_retired!(prim::Primitives, v::Array{Float64,1})
+  # initialize
+  Tv = fill(-Inf,prim.a_size)
+  policy = zeros(prim.a_size)
+
+  #= exploit monotonicity of policy function and only look for
+  asset choices above the choice for previous asset level =#
+
+  # Initialize lower bound of asset choices
+  choice_lower = 1
+
+  # find max value for each a
+  for asset_index in 1:prim.a_size
+    a = prim.a_vals[asset_index]
+
+    max_value = -Inf # initialize value
+
+      for choice_index in choice_lower:prim.a_size
+        aprime = prim.a_vals[choice_index]
+        c = (1+prim.r)*a + prim.b - aprime
+        if c > 0
+          value = (1/(1-prim.sigma))*(c^((1-prim.sigma)*prim.gamma)) +
+          prim.beta*v[choice_index]
+          if value > max_value
+            max_value = value
+            policy[asset_index,state_index] = choice_index
+            choice_lower = choice_index
+          end
+        end
+      end
+    Tv[asset_index,state_index] = max_value
+  end
+  Tv, policy
+end
+
+# Operator for working agent
+
+function bellman_working!(prim::Primitives, v::Array{Float64,2}, age::Int64)
+  # initialize output
+  Tv = fill(-Inf,(prim.a_size,prim.z_size))
+  policy = zeros(Int64,prim.a_size,prim.z_size)
+
+  # pull in age-efficiency value
+
+  for z_index in 1:prim.z_size
+  z = prim.z_vals[z_index]
+
+  #= exploit monotonicity of policy function and only look for
+  asset choices above the choice for previous asset level =#
+
+  # Initialize lower bound of asset choices
+  choice_lower = 1
+
+    for asset_index in 1:prim.a_size
+    a = prim.a_vals[asset_index]
+
+    max_value = -Inf # initialize value for (a,z) combinations
+
+      for choice_index in choice_lower:prim.a_size
+        aprime = prim.a_vals[choice_index]
+        # calculate optimal labor supply for choice of aprime
+        l = (prim.gamma*(1-prim.theta)*z*prim.w - (1-prim.gamma)*((1+prim.r)*a-aprime))*
+          (((1-prim.theta)*w*z)^(-1))
+
+        c = s + a - (1/(1+prim.r))*aprime
+        if c > 0.00
+          value = (1/(1-prim.alpha))*(1/(c^(prim.alpha-1))-1) +
+          prim.beta*dot(prim.markov[state_index,:],
+          (prim.rho*v1[choice_index,:]+
+          (1-prim.rho)*v0[choice_index,:]))
+          if value >= max_value
+            max_value = value
+            sigma1[asset_index,state_index] = choice_index
+            choice_lower = choice_index
+          end
+        end
+
+      end
+    Tv1[asset_index,state_index] = max_value
+    end
+  end
+  Tv1, sigma1
+end
