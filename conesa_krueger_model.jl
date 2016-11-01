@@ -144,7 +144,7 @@ function bellman_working!(prim::Primitives, v::Array{Float64,2}, age::Int64)
         # calculate optimal labor supply for choice of aprime
         l = (prim.gamma*(1-prim.theta)*prim.ageeff[age]*z*prim.w -
           (1-prim.gamma)*((1+prim.r)*a-aprime))*
-          (1/((1-prim.theta)*prim.w*prim.ageeff[age]))
+          (1/((1-prim.theta)*prim.ageeff[age]*z*prim.w))
         if l < 0.00
           l = 0.00
         elseif l > 1.00
