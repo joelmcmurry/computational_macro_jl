@@ -348,12 +348,3 @@ function create_steadystate!(prim::Primitives,res::Results)
 
   res
 end
-
-sumtest = zeros(Float64,66)
-for i in 1:66
-  if i < 46
-    sumtest[i]=sum(res.ss_working_hi[:,i])+sum(res.ss_working_lo[:,i])
-  else
-    sumtest[i]=sum(res.ss_retired[:,i-46+1])
-  end
-end
