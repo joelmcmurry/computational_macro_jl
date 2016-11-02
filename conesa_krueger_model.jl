@@ -69,54 +69,47 @@ end
 
 ## Type Results which holds results of the problem
 
-#= Results will hold value and policy for two user-specified
-ages: one for working agent and one for retire agent. Defaults
-are newborn and first year of retirement =#
-
 type Results
-    working_age::Int64
-    retired_age::Int64
-    v_working::Array{Float64}
+    v_working_hi::Array{Float64}
+    v_working_lo::Array{Float64}
     v_retired::Array{Float64}
-    policy_working::Array{Float64}
+    policy_working_hi::Array{Float64}
+    policy_working_lo::Array{Float64}
     policy_retired::Array{Float64}
-    labor_supply::Array{Float64}
-    statdist_working::Array{Float64}
-    statdist_retired::Array{Float64}
+    labor_supply_hi::Array{Float64}
+    labor_supply_lo::Array{Float64}
+    ss_working_hi::Array{Float64}
+    ss_working_lo::Array{Float64}
+    ss_retired::Array{Float64}
+    mu::Array{Float64}
 
-    function Results(prim::Primitives;
-      return_working_age=1, return_retired_age=46)
+    function Results(prim::Primitives)
 
-        working_age = return_working_age
-        retired_age = return_retired_age
+      v_working_hi = fill(-Inf,prim.a_size,prim.JR-1)
+      v_working_lo = fill(-Inf,prim.a_size,prim.JR-1)
+      v_retired = fill(-Inf,prim.a_size,prim.N-prim.JR+1)
 
-        v_working = zeros(Float64,prim.a_size,prim.z_size)
-        v_retired = zeros(Float64,prim.a_size)
-        policy_working = zeros(Int64,prim.a_size,prim.z_size)
-        policy_retired = zeros(Int64,prim.a_size)
-        labor_supply = zeros(Int64,prim.a_size,prim.z_size)
+      policy_working_hi = zeros(Int64,prim.a_size,prim.JR-1)
+      policy_working_lo = zeros(Int64,prim.a_size,prim.JR-1)
+      policy_retired = zeros(Int64,prim.a_size,prim.N-prim.JR+1)
 
-        statdist_working = ones(prim.M)*(1/prim.M)
-        statdist_retired = ones(prim.a_size)*(1/prim.a_size)
+      labor_supply_hi = zeros(Float64,prim.a_size,prim.JR-1)
+      labor_supply_lo = zeros(Float64,prim.a_size,prim.JR-1)
 
-        res = new(working_age, retired_age, v_working,
-          v_retired, policy_working, policy_retired,
-          labor_supply, statdist_working, statdist_retired)
+      ss_working_hi = zeros(Float64,prim.a_size,prim.JR-1)
+      ss_working_lo = zeros(Float64,prim.a_size,prim.JR-1)
+      ss_retired = zeros(Float64,prim.a_size,prim.N-prim.JR+1)
+
+      mu = ones(Float64,prim.N)
+
+      res = new(v_working_hi, v_working_lo, v_retired,
+        policy_working_hi, policy_working_lo, policy_retired,
+        labor_supply_hi, labor_supply_lo,
+        ss_working_hi, ss_working_lo, ss_retired, mu)
 
         res
     end
 
-end
-
-## Solve Discrete Dynamic Program
-
-function SolveProgram(prim::Primitives;
-    return_working_age=1, return_retired_age=46,
-    epsilon_statdist=1e-3)
-    res = Results(prim,return_working_age,return_retired_age)
-    back_induction!(prim)
-    #create_statdist!(prim, epsilon_statdist)
-    res
 end
 
 #= Internal Utilities =#
@@ -216,7 +209,7 @@ end
 
 ## Backward Induction Procedures
 
-function back_induction!(prim::Primitives)
+function back_induction!(prim::Primitives,res::Results)
   # Initialize terminal period value
   vN = fill(-Inf,prim.a_size)
 
@@ -227,27 +220,17 @@ function back_induction!(prim::Primitives)
     vN[asset_index] = (1/(1-prim.sigma))*(c^((1-prim.sigma)*prim.gamma))
   end
 
-  # Initialize output arrays
-  v_retire = fill(-Inf,prim.a_size,prim.N-prim.JR+1)
-  v_working_hi = fill(-Inf,prim.a_size,prim.JR-1)
-  v_working_lo = fill(-Inf,prim.a_size,prim.JR-1)
-  policy_retire = zeros(Int64,prim.a_size,prim.N-prim.JR+1)
-  policy_working_hi = zeros(Int64,prim.a_size,prim.JR-1)
-  policy_working_lo = zeros(Int64,prim.a_size,prim.JR-1)
-  labor_supply_hi = zeros(Float64,prim.a_size,prim.JR-1)
-  labor_supply_lo = zeros(Float64,prim.a_size,prim.JR-1)
-
   # Backward induction to find value at beginning of retirement
-  v_retire[:,prim.N-prim.JR+1] = vN
-  policy_retire[:,prim.N-prim.JR+1] = ones(prim.a_size)
+  res.v_retired[:,prim.N-prim.JR+1] = vN
+  res.policy_retired[:,prim.N-prim.JR+1] = ones(prim.a_size)
   vfloat_r = vN
   for i in 1:prim.N-prim.JR
     age = prim.N - i
     backward_index = age - prim.JR + 1
     age_optimization = bellman_retired!(prim,vfloat_r)
     vfloat_r = age_optimization[1]
-    policy_retire[:,backward_index] = age_optimization[2]
-    v_retire[:,backward_index] = vfloat_r
+    res.policy_retired[:,backward_index] = age_optimization[2]
+    res.v_retired[:,backward_index] = vfloat_r
   end
 
   # Backward induction to find value at beginning of life
@@ -259,78 +242,95 @@ function back_induction!(prim::Primitives)
     vfloat_w = age_optimization[1]
     policy_working = age_optimization[2]
     labor_supply_working = age_optimization[3]
-    v_working_hi[:,backward_index] = vfloat_w[:,1]
-    v_working_lo[:,backward_index] = vfloat_w[:,2]
-    policy_working_hi[:,backward_index] = policy_working[:,1]
-    policy_working_lo[:,backward_index] = policy_working[:,2]
-    labor_supply_hi[:,backward_index] = labor_supply_working[:,1]
-    labor_supply_lo[:,backward_index] = labor_supply_working[:,2]
+    res.v_working_hi[:,backward_index] = vfloat_w[:,1]
+    res.v_working_lo[:,backward_index] = vfloat_w[:,2]
+    res.policy_working_hi[:,backward_index] = policy_working[:,1]
+    res.policy_working_lo[:,backward_index] = policy_working[:,2]
+    res.labor_supply_hi[:,backward_index] = labor_supply_working[:,1]
+    res.labor_supply_lo[:,backward_index] = labor_supply_working[:,2]
   end
 
-  return v_retire, v_working_hi, v_working_lo, policy_working_hi,
-    policy_working_lo, policy_retire, labor_supply_hi,
-    labor_supply_lo
+  res
 end
 
 ## Stationary distribution
 
-function create_steadystate!(prim::Primitives)
+function create_steadystate!(prim::Primitives,res::Results)
 
-# Find relative sizes of cohorts
+  # Find relative sizes of cohorts
+  res.mu = ones(Float64,prim.N)
+  for i in 1:prim.N-1
+    res.mu[i+1]=res.mu[i]/(1+prim.n)
+  end
 
-mu = ones(Float64,prim.N)
+  # Normalize so relative sizes sum to 1
+  res.mu = res.mu/(sum(res.mu))
 
-for i in 1:prim.N-1
-  mu[i+1]=mu[i]/(1+prim.n)
-end
+  # Reset steady state distributions
 
-mu = mu/(sum(mu))
+  res.ss_working_hi = zeros(Float64,prim.a_size,prim.JR-1)
+  res.ss_working_lo = zeros(Float64,prim.a_size,prim.JR-1)
+  res.ss_retired = zeros(Float64,prim.a_size,prim.N-prim.JR+1)
 
-N = prim.N
-m = prim.a_size
+  #= Start newborn generation with 0 wealth and draw from ergodic
+  distribution for ability =#
 
-#= Create transition matrix Tstar that is N x N, where N is the number
-of (a,s) combinations. Each row of Tstar is a conditional distribution over
-(a',s') conditional on the (a,s) today defined by row index =#
-
-Tstar = spzeros(N,N)
-
-for state_today in 1:N
-  choice_index = res.sigma[prim.a_s_indices[state_today,1],
-  prim.a_s_indices[state_today,2]] #a' given (a,s)
-  for state_tomorrow in 1:N
-    if prim.a_s_indices[state_tomorrow,1] == choice_index
-      Tstar[state_today,state_tomorrow] =
-        prim.markov[prim.a_s_indices[state_today,2]
-        ,prim.a_s_indices[state_tomorrow,2]]
+  for asset in 1:prim.a_size
+    if prim.a_vals[asset] == 0.00
+      res.ss_working_hi[asset,1] = res.mu[1]*prim.z_ergodic[1]
+      res.ss_working_lo[asset,1] = res.mu[1]*prim.z_ergodic[2]
+    else
+      res.ss_working_hi[asset,1] = 0.00
+      res.ss_working_lo[asset,1] = 0.00
     end
   end
-end
 
-#= Find stationary distribution. Start with any distribution over
-states and feed through Tstar matrix until convergence=#
+  #= Use policy rules to calculate steady state asset holdings and ability
+  at each age, weighted by relative cohort mass =#
 
-statdist = res.statdist
-
-num_iter = 0
-
-  for i in 1:max_iter
-
-      statdistprime = Tstar'*statdist
-
-      # compute error and update stationary distribution
-      err = maxabs(statdistprime .- statdist)
-      copy!(statdist, statdistprime)
-      num_iter += 1
-
-      if err < epsilon
-          break
+  for age in 2:prim.N
+    for asset in 1:prim.a_size # loop over asset holdings in previous year
+      for choice_index in 1:prim.a_size # loop over possible policies
+        if age < prim.JR # before retirement
+          if res.policy_working_hi[asset,age-1] == choice_index
+            res.ss_working_hi[choice_index,age] +=
+              (res.mu[age]/res.mu[age-1])*res.ss_working_hi[asset,age-1]*prim.z_markov[1,1]
+            res.ss_working_lo[choice_index,age] +=
+              (res.mu[age]/res.mu[age-1])*res.ss_working_hi[asset,age-1]*prim.z_markov[1,2]
+          end
+          if res.policy_working_lo[asset,age-1] == choice_index
+            res.ss_working_hi[choice_index,age] +=
+              (res.mu[age]/res.mu[age-1])*res.ss_working_lo[asset,age-1]*prim.z_markov[2,1]
+            res.ss_working_lo[choice_index,age] +=
+              (res.mu[age]/res.mu[age-1])*res.ss_working_lo[asset,age-1]*prim.z_markov[2,2]
+          end
+        elseif age == prim.JR # at retirement
+          if res.policy_working_hi[asset,age-1] == choice_index
+            res.ss_retired[choice_index,1] +=
+              (res.mu[age]/res.mu[age-1])*res.ss_working_hi[asset,age-1]
+          end
+          if res.policy_working_lo[asset,age-1] == choice_index
+            res.ss_retired[choice_index,1] +=
+              (res.mu[age]/res.mu[age-1])*res.ss_working_lo[asset,age-1]
+          end
+        else # after retirement
+          if res.policy_retired[asset,age-prim.JR] == choice_index
+            res.ss_retired[choice_index,age-prim.JR+1] +=
+              (res.mu[age]/res.mu[age-1])*res.ss_retired[asset,age-prim.JR]
+          end
+        end
       end
+    end
   end
 
-  res.statdist = statdist
-  res.num_dist = num_iter
-
   res
+end
 
+sumtest = zeros(Float64,66)
+for i in 1:66
+  if i < 46
+    sumtest[i]=sum(res.ss_working_hi[:,i])+sum(res.ss_working_lo[:,i])
+  else
+    sumtest[i]=sum(res.ss_retired[:,i-46+1])
+  end
 end
