@@ -112,6 +112,29 @@ type Results
 
 end
 
+#= Solve model and return user-requested value and policies for
+one working year and one retired year. Defaults are first year
+of working life and first year of retired life =#
+
+function SolveProgram(prim::Primitives;
+  return_working_age=1, return_retired_age=46)
+    res = Results(prim)
+    back_induction!(prim,res)
+    create_steadystate!(prim, res)
+    res
+
+    v_working = hcat(res.v_working_hi[:,return_working_age],
+      res.v_working_lo[:,return_working_age])
+    v_retired = res.v_retired[:,return_retired_age-prim.JR+1]
+    policy_working = hcat(res.policy_working_hi[:,return_working_age],
+      res.policy_working_lo[:,return_working_age])
+    policy_retired = res.policy_retired[:,return_retired_age-prim.JR+1]
+    labor_supply = hcat(res.labor_supply_hi[:,return_working_age],
+      res.labor_supply_lo[:,return_working_age])
+
+    return v_working, v_retired, policy_working, policy_retired, labor_supply
+end
+
 #= Internal Utilities =#
 
 ## Bellman Operators
