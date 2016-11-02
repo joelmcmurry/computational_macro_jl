@@ -67,9 +67,57 @@ function Primitives(;N::Int64=66,JR::Int64=46,n::Float64=0.011,beta::Float64=0.9
 
 end
 
-## Type Results which holds results of the problem HERE
+## Type Results which holds results of the problem
 
-## Solve Discrete Dynamic Program HERE
+#= Results will hold value and policy for two user-specified
+ages: one for working agent and one for retire agent. Defaults
+are newborn and first year of retirement =#
+
+type Results
+    working_age::Int64
+    retired_age::Int64
+    v_working::Array{Float64}
+    v_retired::Array{Float64}
+    policy_working::Array{Float64}
+    policy_retired::Array{Float64}
+    labor_supply::Array{Float64}
+    statdist_working::Array{Float64}
+    statdist_retired::Array{Float64}
+
+    function Results(prim::Primitives;
+      return_working_age=1, return_retired_age=46)
+
+        working_age = return_working_age
+        retired_age = return_retired_age
+
+        v_working = zeros(Float64,prim.a_size,prim.z_size)
+        v_retired = zeros(Float64,prim.a_size)
+        policy_working = zeros(Int64,prim.a_size,prim.z_size)
+        policy_retired = zeros(Int64,prim.a_size)
+        labor_supply = zeros(Int64,prim.a_size,prim.z_size)
+
+        statdist_working = ones(prim.M)*(1/prim.M)
+        statdist_retired = ones(prim.a_size)*(1/prim.a_size)
+
+        res = new(working_age, retired_age, v_working,
+          v_retired, policy_working, policy_retired,
+          labor_supply, statdist_working, statdist_retired)
+
+        res
+    end
+
+end
+
+## Solve Discrete Dynamic Program
+
+function SolveProgram(prim::Primitives;
+    return_working_age=1, return_retired_age=46,
+    epsilon_statdist=1e-3)
+    res = Results(prim,return_working_age,return_retired_age)
+    back_induction!(prim)
+    #create_statdist!(prim, epsilon_statdist)
+    res
+end
 
 #= Internal Utilities =#
 
@@ -168,12 +216,7 @@ end
 
 ## Backward Induction Procedures
 
-function back_induction!(prim;
-  return_working::Int64=1, return_retire::Int64=46)
-  # Initialize age-specific value functions to return
-  v_out_working = fill(-Inf,prim.a_size,prim.z_size)
-  v_out_retire = fill(-Inf,prim.a_size)
-
+function back_induction!(prim::Primitives)
   # Initialize terminal period value
   vN = fill(-Inf,prim.a_size)
 
@@ -184,47 +227,110 @@ function back_induction!(prim;
     vN[asset_index] = (1/(1-prim.sigma))*(c^((1-prim.sigma)*prim.gamma))
   end
 
-  # Initialize choice output arrays
-  policy_retire = zeros(Int64,prim.a_size,prim.N-prim.JR)
+  # Initialize output arrays
+  v_retire = fill(-Inf,prim.a_size,prim.N-prim.JR+1)
+  v_working_hi = fill(-Inf,prim.a_size,prim.JR-1)
+  v_working_lo = fill(-Inf,prim.a_size,prim.JR-1)
+  policy_retire = zeros(Int64,prim.a_size,prim.N-prim.JR+1)
   policy_working_hi = zeros(Int64,prim.a_size,prim.JR-1)
   policy_working_lo = zeros(Int64,prim.a_size,prim.JR-1)
   labor_supply_hi = zeros(Float64,prim.a_size,prim.JR-1)
   labor_supply_lo = zeros(Float64,prim.a_size,prim.JR-1)
 
   # Backward induction to find value at beginning of retirement
-  v_retire = vN
+  v_retire[:,prim.N-prim.JR+1] = vN
+  policy_retire[:,prim.N-prim.JR+1] = ones(prim.a_size)
+  vfloat_r = vN
   for i in 1:prim.N-prim.JR
     age = prim.N - i
     backward_index = age - prim.JR + 1
-    age_optimization = bellman_retired!(prim,v_retire)
-    v_retire = age_optimization[1]
+    age_optimization = bellman_retired!(prim,vfloat_r)
+    vfloat_r = age_optimization[1]
     policy_retire[:,backward_index] = age_optimization[2]
-
-    if age == return_retire
-      v_out_retire = v_retire
-    end
+    v_retire[:,backward_index] = vfloat_r
   end
 
   # Backward induction to find value at beginning of life
-  v_working = hcat(v_retire,v_retire)
+  vfloat_w = hcat(vfloat_r,vfloat_r)
   for i in 1:prim.JR-1
     age = prim.JR - i
     backward_index = age
-    age_optimization = bellman_working!(prim,v_working,age)
-    v_working = age_optimization[1]
+    age_optimization = bellman_working!(prim,vfloat_w,age)
+    vfloat_w = age_optimization[1]
     policy_working = age_optimization[2]
     labor_supply_working = age_optimization[3]
+    v_working_hi[:,backward_index] = vfloat_w[:,1]
+    v_working_lo[:,backward_index] = vfloat_w[:,2]
     policy_working_hi[:,backward_index] = policy_working[:,1]
     policy_working_lo[:,backward_index] = policy_working[:,2]
     labor_supply_hi[:,backward_index] = labor_supply_working[:,1]
     labor_supply_lo[:,backward_index] = labor_supply_working[:,2]
-
-    if age == return_working
-      v_out_working = v_working
-    end
   end
 
-  return v_out_working, v_out_retire, policy_working_hi, policy_working_lo,
-    policy_retire, labor_supply_hi, labor_supply_lo
+  return v_retire, v_working_hi, v_working_lo, policy_working_hi,
+    policy_working_lo, policy_retire, labor_supply_hi,
+    labor_supply_lo
 end
-test = back_induction!(prim,return_working=2,return_retire=65)
+
+## Stationary distribution
+
+function create_steadystate!(prim::Primitives)
+
+# Find relative sizes of cohorts
+
+mu = ones(Float64,prim.N)
+
+for i in 1:prim.N-1
+  mu[i+1]=mu[i]/(1+prim.n)
+end
+
+mu = mu/(sum(mu))
+
+N = prim.N
+m = prim.a_size
+
+#= Create transition matrix Tstar that is N x N, where N is the number
+of (a,s) combinations. Each row of Tstar is a conditional distribution over
+(a',s') conditional on the (a,s) today defined by row index =#
+
+Tstar = spzeros(N,N)
+
+for state_today in 1:N
+  choice_index = res.sigma[prim.a_s_indices[state_today,1],
+  prim.a_s_indices[state_today,2]] #a' given (a,s)
+  for state_tomorrow in 1:N
+    if prim.a_s_indices[state_tomorrow,1] == choice_index
+      Tstar[state_today,state_tomorrow] =
+        prim.markov[prim.a_s_indices[state_today,2]
+        ,prim.a_s_indices[state_tomorrow,2]]
+    end
+  end
+end
+
+#= Find stationary distribution. Start with any distribution over
+states and feed through Tstar matrix until convergence=#
+
+statdist = res.statdist
+
+num_iter = 0
+
+  for i in 1:max_iter
+
+      statdistprime = Tstar'*statdist
+
+      # compute error and update stationary distribution
+      err = maxabs(statdistprime .- statdist)
+      copy!(statdist, statdistprime)
+      num_iter += 1
+
+      if err < epsilon
+          break
+      end
+  end
+
+  res.statdist = statdist
+  res.num_dist = num_iter
+
+  res
+
+end
