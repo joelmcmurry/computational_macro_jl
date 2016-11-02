@@ -120,9 +120,6 @@ function bellman_working!(prim::Primitives, v::Array{Float64,2}, age::Int64)
   policy = zeros(Int64,prim.a_size,prim.z_size)
   labor = zeros(Float64,prim.a_size,prim.z_size)
 
-  testc = zeros(Float64,prim.a_size,prim.z_size)
-  testv = zeros(Float64,prim.a_size,prim.z_size)
-
   # pull in age-efficiency value
 
   for z_index in 1:prim.z_size
@@ -160,14 +157,74 @@ function bellman_working!(prim::Primitives, v::Array{Float64,2}, age::Int64)
             policy[asset_index,z_index] = choice_index
             labor[asset_index,z_index] = l
             choice_lower = choice_index
-            testc[asset_index,z_index] = c
-            testv[asset_index,z_index] = value
           end
         end
       end
     Tv[asset_index,z_index] = max_value
     end
   end
-  Tv, policy, labor, testc, testv
+  Tv, policy, labor
 end
-testbell = bellman_working!(prim,v,age)
+
+## Backward Induction Procedures
+
+function back_induction!(prim;
+  return_working::Int64=1, return_retire::Int64=46)
+  # Initialize age-specific value functions to return
+  v_out_working = fill(-Inf,prim.a_size,prim.z_size)
+  v_out_retire = fill(-Inf,prim.a_size)
+
+  # Initialize terminal period value
+  vN = fill(-Inf,prim.a_size)
+
+  # Calculate terminal period value
+  for asset_index in 1:prim.a_size
+    a = prim.a_vals[asset_index]
+    c = (1+prim.r)*a + prim.b
+    vN[asset_index] = (1/(1-prim.sigma))*(c^((1-prim.sigma)*prim.gamma))
+  end
+
+  # Initialize choice output arrays
+  policy_retire = zeros(Int64,prim.a_size,prim.N-prim.JR)
+  policy_working_hi = zeros(Int64,prim.a_size,prim.JR-1)
+  policy_working_lo = zeros(Int64,prim.a_size,prim.JR-1)
+  labor_supply_hi = zeros(Float64,prim.a_size,prim.JR-1)
+  labor_supply_lo = zeros(Float64,prim.a_size,prim.JR-1)
+
+  # Backward induction to find value at beginning of retirement
+  v_retire = vN
+  for i in 1:prim.N-prim.JR
+    age = prim.N - i
+    backward_index = age - prim.JR + 1
+    age_optimization = bellman_retired!(prim,v_retire)
+    v_retire = age_optimization[1]
+    policy_retire[:,backward_index] = age_optimization[2]
+
+    if age == return_retire
+      v_out_retire = v_retire
+    end
+  end
+
+  # Backward induction to find value at beginning of life
+  v_working = hcat(v_retire,v_retire)
+  for i in 1:prim.JR-1
+    age = prim.JR - i
+    backward_index = age
+    age_optimization = bellman_working!(prim,v_working,age)
+    v_working = age_optimization[1]
+    policy_working = age_optimization[2]
+    labor_supply_working = age_optimization[3]
+    policy_working_hi[:,backward_index] = policy_working[:,1]
+    policy_working_lo[:,backward_index] = policy_working[:,2]
+    labor_supply_hi[:,backward_index] = labor_supply_working[:,1]
+    labor_supply_lo[:,backward_index] = labor_supply_working[:,2]
+
+    if age == return_working
+      v_out_working = v_working
+    end
+  end
+
+  return v_out_working, v_out_retire, policy_working_hi, policy_working_lo,
+    policy_retire, labor_supply_hi, labor_supply_lo
+end
+test = back_induction!(prim,return_working=2,return_retire=65)
