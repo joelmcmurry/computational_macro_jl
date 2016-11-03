@@ -118,12 +118,12 @@ end
 
 # with social security
 tic()
-baseline = compute_GE(a_size=100,max_iter=200,K0=2.03,L0=0.3)
+baseline = compute_GE(a_size=1000,max_iter=100,K0=2.03,L0=0.3)
 toc()
 
 # without social security
 tic()
-baseline_no_ss = compute_GE(a_size=500,max_iter=200,theta=0.00,K0=2.09,L0=0.32)
+baseline_no_ss = compute_GE(a_size=1000,max_iter=100,theta=0.00,K0=2.098,L0=0.325)
 toc()
 
 ## No idiosyncratic risk
@@ -149,6 +149,15 @@ toc()
 tic()
 exo_labor_no_ss = compute_GE(a_size=1000,max_iter=100,exo_labor="yes",theta=0.00)
 toc()
+
+#= Tables for Output to LaTeX =#
+
+output = Array(Any,(7,6))
+titles_vert = ["K","L","w","r","b","W","cv"]
+titles_horz = ["Bench","Bench (No SS)", "No Risk", "No Risk (No SS)",
+  "Exog. Labor", "Exog. Labor (No SS)"]
+K_vals = [baseline[1] baseline_no_ss[1] no_idio_risk[1] no_idio_risk_no_ss[1]
+  exo_labor[1] exo_labor_no_ss[1]]
 
 #= Graphs =#
 
