@@ -1,32 +1,34 @@
 #=
 Program Name: conesa_krueger_compute.jl
-Runs Conesa-Krueger model
+Runs Conesa-Krueger model and performs policy experiments
 =#
 
 using PyPlot
 
 include("conesa_krueger_model.jl")
 
-## Initialize Primitives
+#= Solve model for example years =#
 
+# Initialize Primitives
 prim = Primitives(a_size=1000,a_max=100.00)
 
 #= Solve worker problem and return value functions and policy functions
 for 50-year old and a 20-year old =#
 tic()
-res, v_20, v_50, policy_20, policy_50, labor_supply_20 = SolveProgram(prim)
+res, v_20, v_50, policy_20, policy_50, labor_supply_20 =
+  SolveProgram(prim,20,50)
 toc()
 
 #= General Equilibrium =#
 
-function compute_GE(;a_size=100,epsilon=1e-4,max_iter=100,
-    K0::Float64=2.0363,L0::Float64=0.3249)
+function compute_GE(;a_size=100,theta=0.11,z_vals=[3.0, 0.5],exo_labor="no",
+    epsilon=1e-3,max_iter=100,K0::Float64=2.0363,L0::Float64=0.3249)
 
   # Initialize primitives
-  prim = Primitives(a_size=a_size)
+  prim = Primitives(a_size=a_size,theta=theta)
 
   # Solve problem with default values
-  results = SolveProgram(prim)[1]
+  results = SolveProgram(prim,exo_labor=exo_labor)
 
   # Initialize aggregate capital and labor with Initial guess of capital and labor
 
@@ -54,28 +56,36 @@ function compute_GE(;a_size=100,epsilon=1e-4,max_iter=100,
 
     # Solve program given prices and benefit
 
-    results = SolveProgram(prim)[1]
+    results = SolveProgram(prim,exo_labor=exo_labor)
 
     # Calculate new aggregate capital and labor
 
     K_new = 0.00
     for working_age in 1:prim.JR-1
-      K_new += dot(results.ss_working_hi[:,working_age],
-        prim.a_vals[results.policy_working_hi[:,working_age]])
-      K_new += dot(results.ss_working_lo[:,working_age],
-        prim.a_vals[results.policy_working_lo[:,working_age]])
+      for asset in 1:prim.a_size
+        K_new += results.ss_working_hi[asset,working_age]*
+          prim.a_vals[results.policy_working_hi[asset,working_age]]
+        K_new += results.ss_working_lo[asset,working_age]*
+          prim.a_vals[results.policy_working_lo[asset,working_age]]
+      end
     end
     for retired_age in 1:prim.N-prim.JR+1
-      K_new += dot(results.ss_retired[:,retired_age],
-        prim.a_vals[results.policy_retired[:,retired_age]])
+      for asset in 1:prim.a_size
+        if results.policy_retired[asset,retired_age] != 0
+          K_new += results.ss_retired[asset,retired_age]*
+            prim.a_vals[results.policy_retired[asset,retired_age]]
+        end
+      end
     end
 
     L_new = 0.00
     for working_age in 1:prim.JR-1
-      L_new += dot(results.ss_working_hi[:,working_age],
-        results.labor_supply_hi[:,working_age]*prim.ageeff[working_age])
-      L_new += dot(results.ss_working_lo[:,working_age],
-        results.labor_supply_lo[:,working_age]*prim.ageeff[working_age])
+      for asset in 1:prim.a_size
+        L_new += results.ss_working_hi[asset,working_age]*
+          results.labor_supply_hi[asset,working_age]*prim.ageeff[working_age]
+        L_new += results.ss_working_lo[asset,working_age]*
+          results.labor_supply_lo[asset,working_age]*prim.ageeff[working_age]
+      end
     end
 
     # Adjust K, L if fails tolerance
@@ -98,9 +108,46 @@ function compute_GE(;a_size=100,epsilon=1e-4,max_iter=100,
 
   end
 
+  K, L, prim.w, prim.r, prim.b, results.W, results.cv, results
+
 end
+
+#= Policy Experiments =#
+
+## Baseline: idiosynractic risk and endogenous labor
+
+# with social security
 tic()
-compute_GE(a_size=1000,max_iter=100)
+baseline = compute_GE(a_size=100,max_iter=200,K0=2.03,L0=0.3)
+toc()
+
+# without social security
+tic()
+baseline_no_ss = compute_GE(a_size=500,max_iter=200,theta=0.00,K0=2.09,L0=0.32)
+toc()
+
+## No idiosyncratic risk
+
+# with social security
+tic()
+no_idio_risk = compute_GE(a_size=1000,max_iter=100,z_vals=[0.5,0.5])
+toc()
+
+# without social security
+tic()
+no_idio_risk_no_ss = compute_GE(a_size=1000,max_iter=100,z_vals=[0.5,0.5],theta=0.00)
+toc()
+
+## Exogenous Labor
+
+# with social security
+tic()
+exo_labor = compute_GE(a_size=1000,max_iter=100,exo_labor="yes")
+toc()
+
+# without social security
+tic()
+exo_labor_no_ss = compute_GE(a_size=1000,max_iter=100,exo_labor="yes",theta=0.00)
 toc()
 
 #= Graphs =#

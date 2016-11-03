@@ -82,6 +82,8 @@ type Results
     ss_working_lo::Array{Float64}
     ss_retired::Array{Float64}
     mu::Array{Float64}
+    W::Float64
+    cv::Float64
 
     function Results(prim::Primitives)
 
@@ -105,7 +107,7 @@ type Results
       res = new(v_working_hi, v_working_lo, v_retired,
         policy_working_hi, policy_working_lo, policy_retired,
         labor_supply_hi, labor_supply_lo,
-        ss_working_hi, ss_working_lo, ss_retired, mu)
+        ss_working_hi, ss_working_lo, ss_retired, mu, 0.00, 0.00)
 
         res
     end
@@ -113,14 +115,14 @@ type Results
 end
 
 #= Solve model and return user-requested value and policies for
-one working year and one retired year. Defaults are first year
-of working life and first year of retired life =#
+one working year and one retired year =#
 
-function SolveProgram(prim::Primitives;
-  return_working_age=1, return_retired_age=46)
+function SolveProgram(prim::Primitives,return_working_age,
+    return_retired_age;exo_labor="no")
     res = Results(prim)
-    back_induction!(prim,res)
+    back_induction!(prim,res,exo_labor=exo_labor)
     create_steadystate!(prim,res)
+    welfare_calculation!(prim,res)
 
     v_working = hcat(res.v_working_hi[:,return_working_age],
       res.v_working_lo[:,return_working_age])
@@ -132,6 +134,17 @@ function SolveProgram(prim::Primitives;
       res.labor_supply_lo[:,return_working_age])
 
     return res, v_working, v_retired, policy_working, policy_retired, labor_supply
+end
+
+#= Solve model without defined return years =#
+
+function SolveProgram(prim::Primitives;exo_labor="no")
+    res = Results(prim)
+    back_induction!(prim,res,exo_labor=exo_labor)
+    create_steadystate!(prim,res)
+    welfare_calculation!(prim,res)
+
+    return res
 end
 
 #= Internal Utilities =#
@@ -177,11 +190,16 @@ end
 
 # Operator for working agent
 
-function bellman_working!(prim::Primitives, v::Array{Float64,2}, age::Int64)
+function bellman_working!(prim::Primitives, v::Array{Float64,2}, age::Int64;
+  exo_labor="no")
   # initialize output
   Tv = fill(-Inf,(prim.a_size,prim.z_size))
   policy = zeros(Int64,prim.a_size,prim.z_size)
-  labor = zeros(Float64,prim.a_size,prim.z_size)
+  if exo_labor == "no"
+    labor = zeros(Float64,prim.a_size,prim.z_size)
+  else
+    labor = ones(Float64,prim.a_size,prim.z_size)
+  end
 
   # pull in age-efficiency value
 
@@ -202,14 +220,20 @@ function bellman_working!(prim::Primitives, v::Array{Float64,2}, age::Int64)
       for choice_index in choice_lower:prim.a_size
         aprime = prim.a_vals[choice_index]
         # calculate optimal labor supply for choice of aprime
-        l = (prim.gamma*(1-prim.theta)*prim.ageeff[age]*z*prim.w -
-          (1-prim.gamma)*((1+prim.r)*a-aprime))*
-          (1/((1-prim.theta)*prim.ageeff[age]*z*prim.w))
-        if l < 0.00
-          l = 0.00
-        elseif l > 1.00
+
+        if exo_labor == "no"
+          l = (prim.gamma*(1-prim.theta)*prim.ageeff[age]*z*prim.w -
+            (1-prim.gamma)*((1+prim.r)*a-aprime))*
+            (1/((1-prim.theta)*prim.ageeff[age]*z*prim.w))
+          if l < 0.00
+            l = 0.00
+          elseif l > 1.00
+            l = 1.00
+          end
+        else # exogenous labor supply = 1
           l = 1.00
         end
+
         c = prim.w*(1-prim.theta)*prim.ageeff[age]*l + (1+prim.r)*a - aprime
         if c > 0.00
           value = (1/(1-prim.sigma))*((c^prim.gamma*(1.00-l)^(1.00-prim.gamma))
@@ -231,7 +255,7 @@ end
 
 ## Backward Induction Procedures
 
-function back_induction!(prim::Primitives,res::Results)
+function back_induction!(prim::Primitives,res::Results;exo_labor="no")
   # Initialize terminal period value
   vN = fill(-Inf,prim.a_size)
 
@@ -260,7 +284,7 @@ function back_induction!(prim::Primitives,res::Results)
   for i in 1:prim.JR-1
     age = prim.JR - i
     backward_index = age
-    age_optimization = bellman_working!(prim,vfloat_w,age)
+    age_optimization = bellman_working!(prim,vfloat_w,age,exo_labor=exo_labor)
     vfloat_w = age_optimization[1]
     policy_working = age_optimization[2]
     labor_supply_working = age_optimization[3]
@@ -346,4 +370,63 @@ function create_steadystate!(prim::Primitives,res::Results)
   end
 
   res
+end
+
+
+## Welfare Calculations
+
+function welfare_calculation!(prim::Primitives, res::Results)
+
+  #= Note: have to loop and sum instead of use dot products because
+  in policy experiments without social security, value of having no
+  assets when retired is -Inf and policy is not filled =#
+
+  # Calculate total welfare
+  W = 0.00
+  for working_age in 1:prim.JR-1
+    for asset in 1:prim.a_size
+      W += res.ss_working_hi[asset,working_age]*res.v_working_hi[asset,working_age]
+      W += res.ss_working_lo[asset,working_age]*res.v_working_lo[asset,working_age]
+    end
+  end
+  for retired_age in 1:prim.N-prim.JR+1
+    for asset in 1:prim.a_size
+      if res.v_retired[asset,retired_age] != -Inf
+        W += res.ss_retired[asset,retired_age]*res.v_retired[asset,retired_age]
+      end
+    end
+  end
+  res.W = W
+
+  # Calculate coefficient of variation of wealth (std dev/mean)
+  avg_wealth = 0.00
+  avg_wealth_sq = 0.00
+  for working_age in 1:prim.JR-1
+    for asset in 1:prim.a_size
+      avg_wealth += res.ss_working_hi[asset,working_age]*
+        prim.a_vals[res.policy_working_hi[asset,working_age]]
+      avg_wealth += res.ss_working_lo[asset,working_age]*
+        prim.a_vals[res.policy_working_lo[asset,working_age]]
+
+      avg_wealth_sq += res.ss_working_hi[asset,working_age]*
+        (prim.a_vals[res.policy_working_hi[asset,working_age]].^2)
+      avg_wealth_sq += res.ss_working_lo[asset,working_age]*
+        (prim.a_vals[res.policy_working_lo[asset,working_age]].^2)
+    end
+  end
+  for retired_age in 1:prim.N-prim.JR+1
+    for asset in 1:prim.a_size
+      if res.policy_retired[asset,retired_age] != 0
+        avg_wealth += res.ss_retired[asset,retired_age]*
+          prim.a_vals[res.policy_retired[asset,retired_age]]
+
+        avg_wealth_sq += res.ss_retired[asset,retired_age]*
+          (prim.a_vals[res.policy_retired[asset,retired_age]].^2)
+      end
+    end
+  end
+  var_wealth = avg_wealth_sq - avg_wealth^2
+  stddev_wealth = var_wealth^(1/2)
+  res.cv = stddev_wealth/avg_wealth
+
 end
