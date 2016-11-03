@@ -41,7 +41,7 @@ names, and creates grid objects=#
 function Primitives(;N::Int64=66,JR::Int64=46,n::Float64=0.011,beta::Float64=0.97,
   gamma::Float64=0.42,sigma::Float64=2.0,delta::Float64=0.06,alpha::Float64=0.36,
   w::Float64=1.05,r::Float64=0.05,b::Float64=0.2,theta::Float64=0.11,
-  a_min::Float64=0.0,a_max::Float64=5.0,a_size::Int64=100,z_vals=[3.0, 0.5],
+  a_min::Float64=0.0,a_max::Float64=100.0,a_size::Int64=100,z_vals=[3.0, 0.5],
   z_markov=[0.9261 (1-0.9261);(1-0.9811) 0.9811],z_ergodic=[0.2037 (1-0.2037)])
 
   # Grids
@@ -118,9 +118,9 @@ end
 one working year and one retired year =#
 
 function SolveProgram(prim::Primitives,return_working_age,
-    return_retired_age;exo_labor="no")
+    return_retired_age)
     res = Results(prim)
-    back_induction!(prim,res,exo_labor=exo_labor)
+    back_induction!(prim,res)
     create_steadystate!(prim,res)
     welfare_calculation!(prim,res)
 
@@ -138,9 +138,9 @@ end
 
 #= Solve model without defined return years =#
 
-function SolveProgram(prim::Primitives;exo_labor="no")
+function SolveProgram(prim::Primitives)
     res = Results(prim)
-    back_induction!(prim,res,exo_labor=exo_labor)
+    back_induction!(prim,res)
     create_steadystate!(prim,res)
     welfare_calculation!(prim,res)
 
@@ -190,16 +190,11 @@ end
 
 # Operator for working agent
 
-function bellman_working!(prim::Primitives, v::Array{Float64,2}, age::Int64;
-  exo_labor="no")
+function bellman_working!(prim::Primitives, v::Array{Float64,2}, age::Int64)
   # initialize output
   Tv = fill(-Inf,(prim.a_size,prim.z_size))
   policy = zeros(Int64,prim.a_size,prim.z_size)
-  if exo_labor == "no"
-    labor = zeros(Float64,prim.a_size,prim.z_size)
-  else
-    labor = ones(Float64,prim.a_size,prim.z_size)
-  end
+  labor = zeros(Float64,prim.a_size,prim.z_size)
 
   # pull in age-efficiency value
 
@@ -221,16 +216,12 @@ function bellman_working!(prim::Primitives, v::Array{Float64,2}, age::Int64;
         aprime = prim.a_vals[choice_index]
         # calculate optimal labor supply for choice of aprime
 
-        if exo_labor == "no"
-          l = (prim.gamma*(1-prim.theta)*prim.ageeff[age]*z*prim.w -
-            (1-prim.gamma)*((1+prim.r)*a-aprime))*
-            (1/((1-prim.theta)*prim.ageeff[age]*z*prim.w))
-          if l < 0.00
-            l = 0.00
-          elseif l > 1.00
-            l = 1.00
-          end
-        else # exogenous labor supply = 1
+        l = (prim.gamma*(1-prim.theta)*prim.ageeff[age]*z*prim.w -
+          (1-prim.gamma)*((1+prim.r)*a-aprime))*
+          (1/((1-prim.theta)*prim.ageeff[age]*z*prim.w))
+        if l < 0.00
+          l = 0.00
+        elseif l > 1.00
           l = 1.00
         end
 
@@ -255,7 +246,7 @@ end
 
 ## Backward Induction Procedures
 
-function back_induction!(prim::Primitives,res::Results;exo_labor="no")
+function back_induction!(prim::Primitives,res::Results)
   # Initialize terminal period value
   vN = fill(-Inf,prim.a_size)
 
@@ -284,7 +275,7 @@ function back_induction!(prim::Primitives,res::Results;exo_labor="no")
   for i in 1:prim.JR-1
     age = prim.JR - i
     backward_index = age
-    age_optimization = bellman_working!(prim,vfloat_w,age,exo_labor=exo_labor)
+    age_optimization = bellman_working!(prim,vfloat_w,age)
     vfloat_w = age_optimization[1]
     policy_working = age_optimization[2]
     labor_supply_working = age_optimization[3]

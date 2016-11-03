@@ -10,7 +10,7 @@ include("conesa_krueger_model.jl")
 #= Solve model for example years =#
 
 # Initialize Primitives
-prim = Primitives(a_size=1000,a_max=100.00)
+prim = Primitives(a_size=1000)
 
 #= Solve worker problem and return value functions and policy functions
 for 50-year old and a 20-year old =#
@@ -21,14 +21,14 @@ toc()
 
 #= General Equilibrium =#
 
-function compute_GE(;a_size=100,theta=0.11,z_vals=[3.0, 0.5],exo_labor="no",
-    epsilon=1e-3,max_iter=100,K0::Float64=2.0363,L0::Float64=0.3249)
+function compute_GE(;a_size=100,theta=0.11,z_vals=[3.0, 0.5],gamma=0.42,
+    epsilon=1e-2,max_iter=100,K0::Float64=2.0,L0::Float64=0.3)
 
   # Initialize primitives
-  prim = Primitives(a_size=a_size,theta=theta)
+  prim = Primitives(a_size=a_size,theta=theta,gamma=gamma)
 
   # Solve problem with default values
-  results = SolveProgram(prim,exo_labor=exo_labor)
+  results = SolveProgram(prim)
 
   # Initialize aggregate capital and labor with Initial guess of capital and labor
 
@@ -56,7 +56,7 @@ function compute_GE(;a_size=100,theta=0.11,z_vals=[3.0, 0.5],exo_labor="no",
 
     # Solve program given prices and benefit
 
-    results = SolveProgram(prim,exo_labor=exo_labor)
+    results = SolveProgram(prim)
 
     # Calculate new aggregate capital and labor
 
@@ -93,8 +93,8 @@ function compute_GE(;a_size=100,theta=0.11,z_vals=[3.0, 0.5],exo_labor="no",
     if max_dist < epsilon
         break
     else
-      L_new = L*0.99 + L_new*0.01
-      K_new = K*0.99 + K_new*0.01
+      L_new = L*0.9 + L_new*0.1
+      K_new = K*0.9 + K_new*0.1
     end
 
     # Calculate new prices
@@ -118,36 +118,40 @@ end
 
 # with social security
 tic()
-baseline = compute_GE(a_size=1000,max_iter=100,K0=2.03,L0=0.3)
+baseline = compute_GE(a_size=1000,max_iter=100,K0=1.99,L0=0.32)
 toc()
 
 # without social security
 tic()
-baseline_no_ss = compute_GE(a_size=1000,max_iter=100,theta=0.00,K0=2.098,L0=0.325)
+baseline_no_ss = compute_GE(a_size=1000,max_iter=100,theta=0.00,
+  K0=2.5,L0=0.34)
 toc()
 
 ## No idiosyncratic risk
 
 # with social security
 tic()
-no_idio_risk = compute_GE(a_size=1000,max_iter=100,z_vals=[0.5,0.5])
+no_idio_risk = compute_GE(a_size=1000,max_iter=100,z_vals=[0.5,0.5],
+  K0=1.99,L0=0.32)
 toc()
 
 # without social security
 tic()
-no_idio_risk_no_ss = compute_GE(a_size=1000,max_iter=100,z_vals=[0.5,0.5],theta=0.00)
+no_idio_risk_no_ss = compute_GE(a_size=1000,max_iter=100,z_vals=[0.5,0.5],
+  theta=0.00,K0=2.5,L0=0.34)
 toc()
 
 ## Exogenous Labor
 
 # with social security
 tic()
-exo_labor = compute_GE(a_size=1000,max_iter=100,exo_labor="yes")
+exo_labor = compute_GE(a_size=1000,max_iter=100,gamma=1.00,K0=5.0,L0=0.75)
 toc()
 
 # without social security
 tic()
-exo_labor_no_ss = compute_GE(a_size=1000,max_iter=100,exo_labor="yes",theta=0.00)
+exo_labor_no_ss = compute_GE(a_size=1000,max_iter=100,gamma=1.00,
+  theta=0.00,K0=2.0,L=1.0)
 toc()
 
 #= Tables for Output to LaTeX =#
