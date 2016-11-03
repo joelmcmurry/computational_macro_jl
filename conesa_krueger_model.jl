@@ -73,9 +73,9 @@ type Results
     v_working_hi::Array{Float64}
     v_working_lo::Array{Float64}
     v_retired::Array{Float64}
-    policy_working_hi::Array{Float64}
-    policy_working_lo::Array{Float64}
-    policy_retired::Array{Float64}
+    policy_working_hi::Array{Int64}
+    policy_working_lo::Array{Int64}
+    policy_retired::Array{Int64}
     labor_supply_hi::Array{Float64}
     labor_supply_lo::Array{Float64}
     ss_working_hi::Array{Float64}
@@ -120,8 +120,7 @@ function SolveProgram(prim::Primitives;
   return_working_age=1, return_retired_age=46)
     res = Results(prim)
     back_induction!(prim,res)
-    create_steadystate!(prim, res)
-    res
+    create_steadystate!(prim,res)
 
     v_working = hcat(res.v_working_hi[:,return_working_age],
       res.v_working_lo[:,return_working_age])
@@ -132,7 +131,7 @@ function SolveProgram(prim::Primitives;
     labor_supply = hcat(res.labor_supply_hi[:,return_working_age],
       res.labor_supply_lo[:,return_working_age])
 
-    return v_working, v_retired, policy_working, policy_retired, labor_supply
+    return res, v_working, v_retired, policy_working, policy_retired, labor_supply
 end
 
 #= Internal Utilities =#
