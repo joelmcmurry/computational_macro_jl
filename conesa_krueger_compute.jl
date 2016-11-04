@@ -109,7 +109,7 @@ function compute_GE(;a_size=100,theta=0.11,z_vals=[3.0, 0.5],gamma=0.42,
 
   end
 
-  K, L, prim.w, prim.r, prim.b, results.W, results.cv, results
+  K, L, prim.w, prim.r, prim.b, results.W, results.cv, results, prim
 
 end
 
@@ -117,48 +117,123 @@ end
 
 ## Baseline: idiosynractic risk and endogenous labor
 
-# with social security
-tic()
-baseline = compute_GE(a_size=1000,max_iter=100,K0=1.99,L0=0.32)
-toc()
+function baseline_calc(;a_size=1000,max_iter=100)
+  # with social security
+  with_ss = compute_GE(a_size=a_size,max_iter=max_iter,K0=1.99,L0=0.32)
+  # without social security
+  without_ss = compute_GE(a_size=a_size,max_iter=max_iter,theta=0.00,
+    K0=2.5,L0=0.34)
 
-# without social security
+    prim = with_ss[9]
+    res = with_ss[8]
+    res_no_ss = without_ss[8]
+
+    vote_yes = 0.0
+    for working_age in 1:prim.JR-1
+      for asset in 1:prim.a_size
+        if res.v_working_hi[asset,working_age] < res_no_ss.v_working_hi[asset,working_age]
+          vote_yes += res.ss_working_hi[asset,working_age]
+        end
+        if res.v_working_lo[asset,working_age] < res_no_ss.v_working_lo[asset,working_age]
+          vote_yes += res.ss_working_lo[asset,working_age]
+        end
+      end
+    end
+    for retired_age in 1:prim.N-prim.JR+1
+      for asset in 1:prim.a_size
+        if res.v_retired[asset,retired_age] < res_no_ss.v_retired[asset,retired_age]
+          vote_yes += res.ss_retired[asset,retired_age]
+        end
+      end
+    end
+
+  return with_ss, without_ss, vote_yes
+end
 tic()
-baseline_no_ss = compute_GE(a_size=1000,max_iter=100,theta=0.00,
-  K0=2.5,L0=0.34)
+baseline, baseline_no_ss, baseline_vote_yes = baseline_calc()
 toc()
 
 ## No idiosyncratic risk
 
-# with social security
-tic()
-no_idio_risk = compute_GE(a_size=1000,max_iter=100,z_vals=[0.5,0.5],
-  K0=1.99,L0=0.32)
-toc()
+function no_idio_risk_calc(;a_size=1000,max_iter=100)
+  # with social security
+  with_ss = compute_GE(a_size=a_size,max_iter=max_iter,z_vals=[0.5,0.5],
+    K0=1.99,L0=0.32)
+  # without social security
+  without_ss = compute_GE(a_size=a_size,max_iter=max_iter,z_vals=[0.5,0.5],
+    theta=0.00,K0=2.5,L0=0.34)
 
-# without social security
+    prim = with_ss[9]
+    res = with_ss[8]
+    res_no_ss = without_ss[8]
+
+    vote_yes = 0.0
+    for working_age in 1:prim.JR-1
+      for asset in 1:prim.a_size
+        if res.v_working_hi[asset,working_age] < res_no_ss.v_working_hi[asset,working_age]
+          vote_yes += res.ss_working_hi[asset,working_age]
+        end
+        if res.v_working_lo[asset,working_age] < res_no_ss.v_working_lo[asset,working_age]
+          vote_yes += res.ss_working_lo[asset,working_age]
+        end
+      end
+    end
+    for retired_age in 1:prim.N-prim.JR+1
+      for asset in 1:prim.a_size
+        if res.v_retired[asset,retired_age] < res_no_ss.v_retired[asset,retired_age]
+          vote_yes += res.ss_retired[asset,retired_age]
+        end
+      end
+    end
+
+  return with_ss, without_ss, vote_yes
+end
 tic()
-no_idio_risk_no_ss = compute_GE(a_size=1000,max_iter=100,z_vals=[0.5,0.5],
-  theta=0.00,K0=2.5,L0=0.34)
+no_idio_risk, no_idio_risk_no_ss, no_idio_risk_vote_yes = no_idio_risk_calc()
 toc()
 
 ## Exogenous Labor
 
-# with social security
-tic()
-exo_labor = compute_GE(a_size=1000,max_iter=100,gamma=1.00,K0=5.0,L0=0.75)
-toc()
+function exo_labor_calc(;a_size=1000,max_iter=100)
+  # with social security
+  with_ss = compute_GE(a_size=1000,max_iter=100,gamma=1.00,K0=5.0,L0=0.75)
+  # without social security
+  without_ss = compute_GE(a_size=1000,max_iter=100,gamma=1.00,
+    theta=0.00,K0=6.3,L0=0.75)
 
-# without social security
+    prim = with_ss[9]
+    res = with_ss[8]
+    res_no_ss = without_ss[8]
+
+    vote_yes = 0.0
+    for working_age in 1:prim.JR-1
+      for asset in 1:prim.a_size
+        if res.v_working_hi[asset,working_age] < res_no_ss.v_working_hi[asset,working_age]
+          vote_yes += res.ss_working_hi[asset,working_age]
+        end
+        if res.v_working_lo[asset,working_age] < res_no_ss.v_working_lo[asset,working_age]
+          vote_yes += res.ss_working_lo[asset,working_age]
+        end
+      end
+    end
+    for retired_age in 1:prim.N-prim.JR+1
+      for asset in 1:prim.a_size
+        if res.v_retired[asset,retired_age] < res_no_ss.v_retired[asset,retired_age]
+          vote_yes += res.ss_retired[asset,retired_age]
+        end
+      end
+    end
+
+  return with_ss, without_ss, vote_yes
+end
 tic()
-exo_labor_no_ss = compute_GE(a_size=1000,max_iter=100,gamma=1.00,
-  theta=0.00,K0=6.3,L0=0.75)
+exo_labor, exo_labor_no_ss, exo_labor_vote_yes = exo_labor_calc()
 toc()
 
 #= Tables for Output to LaTeX =#
 
-output = Array(Any,(8,7))
-titles_vert = ["K","L","w","r","b","W","cv"]
+output = Array(Any,(9,7))
+titles_vert = ["K","L","w","r","b","W","cv","vote"]
 titles_horz = ["Bench","Bench (No SS)", "No Risk", "No Risk (No SS)",
   "Exog. Labor", "Exog. Labor (No SS)"]
 
@@ -183,8 +258,11 @@ W_vals = hcat(round(baseline[6],3), round(baseline_no_ss[6],3),
 cv_vals = hcat(round(baseline[7],3), round(baseline_no_ss[7],3),
   round(no_idio_risk[7],3), round(no_idio_risk_no_ss[7],3), round(exo_labor[7],3),
   round(exo_labor_no_ss[7],3))
+vote_vals = hcat(round(baseline_vote_yes,3),string(" "),
+  round(no_idio_risk_vote_yes,3), string(" "), round(exo_labor_vote_yes,3),
+  string(" "))
 
-output[2:8,1] = titles_vert
+output[2:9,1] = titles_vert
 output[1,2:7] = titles_horz
 output[2,2:7] = K_vals
 output[3,2:7] = L_vals
@@ -193,7 +271,8 @@ output[5,2:7] = r_vals
 output[6,2:7] = b_vals
 output[7,2:7] = W_vals
 output[8,2:7] = cv_vals
-output[1,1] = " "
+output[1,1] = string(" ")
+output[9,2:7] = vote_vals
 
 tabular(output)
 
