@@ -147,6 +147,99 @@ function SolveProgram(prim::Primitives)
     return res
 end
 
+#= General Equilibrium =#
+
+function compute_GE(;a_size=100,theta=0.11,z_vals=[3.0, 0.5],gamma=0.42,
+    epsilon=1e-2,max_iter=100,K0::Float64=2.0,L0::Float64=0.3)
+
+  # Initialize primitives
+  prim = Primitives(a_size=a_size,theta=theta,gamma=gamma,z_vals=z_vals)
+
+  # Solve problem with default values
+  results = SolveProgram(prim)
+
+  # Initialize aggregate capital and labor with Initial guess of capital and labor
+
+  K = K0
+  L = L0
+
+  # Calculate initial wages and rental rate
+  prim.w = (1-prim.alpha)*K^(prim.alpha)*L^(-prim.alpha)
+  prim.r = prim.alpha*K^(prim.alpha-1)*L^(1-prim.alpha) - prim.delta
+
+  max_dist = 100.00
+
+  for i in 1:max_iter
+
+    # Print iteration, wage, rental rate
+    println("Iter: ", i, " L: ", L," K: ", K, " Max Dist.: ", max_dist)
+
+    # Calculate benefit
+    mass_b = 0.00  # calculate mass receiving benefits
+    for age in 1:prim.N-prim.JR+1
+      mass_b += sum(results.ss_retired[:,age])
+    end
+
+    prim.b = (prim.theta*prim.w*L)/mass_b
+
+    # Solve program given prices and benefit
+
+    results = SolveProgram(prim)
+
+    # Calculate new aggregate capital and labor
+
+    K_new = 0.00
+    for working_age in 1:prim.JR-1
+      for asset in 1:prim.a_size
+        K_new += results.ss_working_hi[asset,working_age]*
+          prim.a_vals[results.policy_working_hi[asset,working_age]]
+        K_new += results.ss_working_lo[asset,working_age]*
+          prim.a_vals[results.policy_working_lo[asset,working_age]]
+      end
+    end
+    for retired_age in 1:prim.N-prim.JR+1
+      for asset in 1:prim.a_size
+        if results.policy_retired[asset,retired_age] != 0
+          K_new += results.ss_retired[asset,retired_age]*
+            prim.a_vals[results.policy_retired[asset,retired_age]]
+        end
+      end
+    end
+
+    L_new = 0.00
+    for working_age in 1:prim.JR-1
+      for asset in 1:prim.a_size
+        L_new += results.ss_working_hi[asset,working_age]*
+          results.labor_supply_hi[asset,working_age]*prim.ageeff[working_age]
+        L_new += results.ss_working_lo[asset,working_age]*
+          results.labor_supply_lo[asset,working_age]*prim.ageeff[working_age]
+      end
+    end
+
+    # Adjust K, L if fails tolerance
+    max_dist = max(abs(K-K_new),abs(L-L_new))
+    if max_dist < epsilon
+        break
+    else
+      L_new = L*0.9 + L_new*0.1
+      K_new = K*0.9 + K_new*0.1
+    end
+
+    # Calculate new prices
+    w_new = (1-prim.alpha)*K_new^(prim.alpha)*L_new^(-prim.alpha)
+    r_new = prim.alpha*K_new^(prim.alpha-1)*L_new^(1-prim.alpha) - prim.delta
+
+    prim.w = w_new
+    prim.r = r_new
+    L = L_new
+    K = K_new
+
+  end
+
+  K, L, prim.w, prim.r, prim.b, results.W, results.cv, results, prim
+
+end
+
 #= Internal Utilities =#
 
 ## Bellman Operators
