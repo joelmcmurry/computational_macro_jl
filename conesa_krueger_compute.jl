@@ -4,6 +4,7 @@ Runs Conesa-Krueger model and performs policy experiments
 =#
 
 using PyPlot
+using LatexPrint
 
 include("conesa_krueger_model.jl")
 
@@ -25,7 +26,7 @@ function compute_GE(;a_size=100,theta=0.11,z_vals=[3.0, 0.5],gamma=0.42,
     epsilon=1e-2,max_iter=100,K0::Float64=2.0,L0::Float64=0.3)
 
   # Initialize primitives
-  prim = Primitives(a_size=a_size,theta=theta,gamma=gamma)
+  prim = Primitives(a_size=a_size,theta=theta,gamma=gamma,z_vals=z_vals)
 
   # Solve problem with default values
   results = SolveProgram(prim)
@@ -151,17 +152,50 @@ toc()
 # without social security
 tic()
 exo_labor_no_ss = compute_GE(a_size=1000,max_iter=100,gamma=1.00,
-  theta=0.00,K0=2.0,L=1.0)
+  theta=0.00,K0=6.3,L0=0.75)
 toc()
 
 #= Tables for Output to LaTeX =#
 
-output = Array(Any,(7,6))
+output = Array(Any,(8,7))
 titles_vert = ["K","L","w","r","b","W","cv"]
 titles_horz = ["Bench","Bench (No SS)", "No Risk", "No Risk (No SS)",
   "Exog. Labor", "Exog. Labor (No SS)"]
-K_vals = [baseline[1] baseline_no_ss[1] no_idio_risk[1] no_idio_risk_no_ss[1]
-  exo_labor[1] exo_labor_no_ss[1]]
+
+K_vals = hcat(round(baseline[1],3), round(baseline_no_ss[1],3),
+  round(no_idio_risk[1],3), round(no_idio_risk_no_ss[1],3), round(exo_labor[1],3),
+  round(exo_labor_no_ss[1],3))
+L_vals = hcat(round(baseline[2],3), round(baseline_no_ss[2],3),
+  round(no_idio_risk[2],3), round(no_idio_risk_no_ss[2],3), round(exo_labor[2],3),
+  round(exo_labor_no_ss[2],3))
+w_vals = hcat(round(baseline[3],3), round(baseline_no_ss[3],3),
+  round(no_idio_risk[3],3), round(no_idio_risk_no_ss[3],3), round(exo_labor[3],3),
+  round(exo_labor_no_ss[3],3))
+r_vals = hcat(round(baseline[4],3), round(baseline_no_ss[4],3),
+  round(no_idio_risk[4],3), round(no_idio_risk_no_ss[4],3), round(exo_labor[4],3),
+  round(exo_labor_no_ss[4],3))
+b_vals = hcat(round(baseline[5],3), round(baseline_no_ss[5],3),
+  round(no_idio_risk[5],3), round(no_idio_risk_no_ss[5],3), round(exo_labor[5],3),
+  round(exo_labor_no_ss[5],3))
+W_vals = hcat(round(baseline[6],3), round(baseline_no_ss[6],3),
+  round(no_idio_risk[6],3), round(no_idio_risk_no_ss[6],3), round(exo_labor[6],3),
+  round(exo_labor_no_ss[6],3))
+cv_vals = hcat(round(baseline[7],3), round(baseline_no_ss[7],3),
+  round(no_idio_risk[7],3), round(no_idio_risk_no_ss[7],3), round(exo_labor[7],3),
+  round(exo_labor_no_ss[7],3))
+
+output[2:8,1] = titles_vert
+output[1,2:7] = titles_horz
+output[2,2:7] = K_vals
+output[3,2:7] = L_vals
+output[4,2:7] = w_vals
+output[5,2:7] = r_vals
+output[6,2:7] = b_vals
+output[7,2:7] = W_vals
+output[8,2:7] = cv_vals
+output[1,1] = " "
+
+tabular(output)
 
 #= Graphs =#
 
