@@ -22,14 +22,15 @@ toc()
 
 #= Policy Experiments =#
 
-## Baseline: idiosynractic risk and endogenous labor
-
-function baseline_calc(;a_size=1000,max_iter=100)
+function policy_experiment(;K0_ss::Float64=2.0,L0_ss::Float64=0.3,
+    K0_no_ss::Float64=2.0,L0_no_ss::Float64=0.3,z_vals::Array{Float64}=[3.0,0.5],
+    gamma::Float64=0.42,a_size=1000,max_iter=100)
   # with social security
-  with_ss = compute_GE(a_size=a_size,max_iter=max_iter,K0=1.99,L0=0.32)
+  with_ss = compute_GE(a_size=a_size,max_iter=max_iter,K0=K0_ss,L0=L0_ss,
+  gamma=gamma,z_vals=z_vals)
   # without social security
-  without_ss = compute_GE(a_size=a_size,max_iter=max_iter,theta=0.00,
-    K0=2.5,L0=0.34)
+  without_ss = compute_GE(a_size=a_size,max_iter=max_iter,K0=K0_no_ss,
+    L0=L0_no_ss,gamma=gamma,z_vals=z_vals,theta=0.00)
 
     prim = with_ss[9]
     res = with_ss[8]
@@ -56,85 +57,28 @@ function baseline_calc(;a_size=1000,max_iter=100)
 
   return with_ss, without_ss, vote_yes
 end
+
+# Baseline: idiosynractic risk and endogenous labor
+
 tic()
-baseline, baseline_no_ss, baseline_vote_yes = baseline_calc()
+baseline, baseline_no_ss, baseline_vote_yes = policy_experiment(K0_ss=1.99,
+  L0_ss=0.32,K0_no_ss=2.5,L0_no_ss=0.34,gamma=0.42,z_vals=[3.0,0.5])
 toc()
 
-## No idiosyncratic risk
+# No idiosyncratic risk
 
-function no_idio_risk_calc(;a_size=1000,max_iter=100)
-  # with social security
-  with_ss = compute_GE(a_size=a_size,max_iter=max_iter,z_vals=[0.5,0.5],
-    K0=1.99,L0=0.32)
-  # without social security
-  without_ss = compute_GE(a_size=a_size,max_iter=max_iter,z_vals=[0.5,0.5],
-    theta=0.00,K0=2.5,L0=0.34)
-
-    prim = with_ss[9]
-    res = with_ss[8]
-    res_no_ss = without_ss[8]
-
-    vote_yes = 0.0
-    for working_age in 1:prim.JR-1
-      for asset in 1:prim.a_size
-        if res.v_working_hi[asset,working_age] < res_no_ss.v_working_hi[asset,working_age]
-          vote_yes += res.ss_working_hi[asset,working_age]
-        end
-        if res.v_working_lo[asset,working_age] < res_no_ss.v_working_lo[asset,working_age]
-          vote_yes += res.ss_working_lo[asset,working_age]
-        end
-      end
-    end
-    for retired_age in 1:prim.N-prim.JR+1
-      for asset in 1:prim.a_size
-        if res.v_retired[asset,retired_age] < res_no_ss.v_retired[asset,retired_age]
-          vote_yes += res.ss_retired[asset,retired_age]
-        end
-      end
-    end
-
-  return with_ss, without_ss, vote_yes
-end
 tic()
-no_idio_risk, no_idio_risk_no_ss, no_idio_risk_vote_yes = no_idio_risk_calc()
+no_idio_risk, no_idio_risk_no_ss, no_idio_risk_vote_yes =
+  policy_experiment(K0_ss=1.99,L0_ss=0.32,K0_no_ss=2.5,L0_no_ss=0.34,
+  gamma=0.42,z_vals=[0.5,0.5])
 toc()
 
-## Exogenous Labor
+# Exogenous Labor
 
-function exo_labor_calc(;a_size=1000,max_iter=100)
-  # with social security
-  with_ss = compute_GE(a_size=1000,max_iter=100,gamma=1.00,K0=5.0,L0=0.75)
-  # without social security
-  without_ss = compute_GE(a_size=1000,max_iter=100,gamma=1.00,
-    theta=0.00,K0=6.3,L0=0.75)
-
-    prim = with_ss[9]
-    res = with_ss[8]
-    res_no_ss = without_ss[8]
-
-    vote_yes = 0.0
-    for working_age in 1:prim.JR-1
-      for asset in 1:prim.a_size
-        if res.v_working_hi[asset,working_age] < res_no_ss.v_working_hi[asset,working_age]
-          vote_yes += res.ss_working_hi[asset,working_age]
-        end
-        if res.v_working_lo[asset,working_age] < res_no_ss.v_working_lo[asset,working_age]
-          vote_yes += res.ss_working_lo[asset,working_age]
-        end
-      end
-    end
-    for retired_age in 1:prim.N-prim.JR+1
-      for asset in 1:prim.a_size
-        if res.v_retired[asset,retired_age] < res_no_ss.v_retired[asset,retired_age]
-          vote_yes += res.ss_retired[asset,retired_age]
-        end
-      end
-    end
-
-  return with_ss, without_ss, vote_yes
-end
 tic()
-exo_labor, exo_labor_no_ss, exo_labor_vote_yes = exo_labor_calc()
+exo_labor, exo_labor_no_ss, exo_labor_vote_yes =
+  policy_experiment(K0_ss=4.7,L0_ss=0.75,K0_no_ss=6.0,L0_no_ss=0.75,
+  gamma=1.0,z_vals=[3.0,0.5])
 toc()
 
 #= Tables for Output to LaTeX =#
