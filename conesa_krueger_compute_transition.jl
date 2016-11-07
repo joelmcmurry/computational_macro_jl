@@ -46,21 +46,16 @@ function transition(steadystate_0,steadystate_N;N=30,epsilon=1e-2,
   r_0 = steadystate_0[4]
   r_N = steadystate_N[4]
 
-  # initial guess for K sequence
-
+  # initial guess for K,L sequences
   K_seq = linspace(K_0,K_N,N+1)
+  L_seq = linspace(L_0,L_N,N+1)
 
-  # initialize sequences of L, w, r
-
-  L_seq = zeros(Float64,N+1)
-  L_seq[1] = L_0
-  L_seq[N+1] = L_N
-
-  r_seq = zeros(Float64,N)
+  # initialize sequences of w, r
+  r_seq = zeros(Float64,N+1)
   r_seq[1] = r_0
   r_seq[N+1] = r_N
 
-  w_seq = zeros(Float64,N)
+  w_seq = zeros(Float64,N+1)
   w_seq[1] = w_0
   w_seq[N+1] = w_N
 
@@ -71,12 +66,9 @@ function transition(steadystate_0,steadystate_N;N=30,epsilon=1e-2,
     # initialize primitives for period t
     prim_t = Primitives(a_size=a_size)
 
-    # take K_t from guessed sequence and guess L_t = L_t+1
-    L_t = L_seq[t+1]
-
     # calculate prices given K_t, L_t (guess)
-    prim_t.w = (1-prim_t.alpha)*K_seq[t]^(prim_t.alpha)*L_t^(-prim_t.alpha)
-    prim_t.r = prim_t.alpha*K_seq[t]^(prim_t.alpha-1)*L_t^(1-prim_t.alpha) - prim_t.delta
+    prim_t.w = (1-prim_t.alpha)*K_seq[t]^(prim_t.alpha)*L_seq[t]^(-prim_t.alpha)
+    prim_t.r = prim_t.alpha*K_seq[t]^(prim_t.alpha-1)*L_seq[t]^(1-prim_t.alpha) - prim_t.delta
 
     # solve program with initial parameters
 
