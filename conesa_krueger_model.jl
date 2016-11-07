@@ -118,10 +118,12 @@ end
 one working year and one retired year =#
 
 function SolveProgram(prim::Primitives,return_working_age,
-    return_retired_age)
+    return_retired_age;steadyflag="yes")
     res = Results(prim)
     back_induction!(prim,res)
-    create_steadystate!(prim,res)
+    if steadyflag == "yes"
+      create_steadystate!(prim,res)
+    end
     welfare_calculation!(prim,res)
 
     v_working = hcat(res.v_working_hi[:,return_working_age],
@@ -138,10 +140,12 @@ end
 
 #= Solve model without defined return years =#
 
-function SolveProgram(prim::Primitives)
+function SolveProgram(prim::Primitives;steadyflag="yes")
     res = Results(prim)
     back_induction!(prim,res)
-    create_steadystate!(prim,res)
+    if steadyflag == "yes"
+      create_steadystate!(prim,res)
+    end
     welfare_calculation!(prim,res)
 
     return res
