@@ -58,12 +58,23 @@ function transition(steadystate_0,steadystate_T;T=30,epsilon=1e-2,max_iter=100)
   w_seq[1] = w_0
   w_seq[T+1] = w_T
 
+  # sequence of taxes
+  theta_seq = zeros(Float64,T+1)
+  theta_seq[1] = steadystate_0[9].theta
+  theta_seq[T+1] = steadystate_T[9].theta
+
+  # store policy functions each period
+  policy_working_hi_seq = Array{Array{Float64}}(T+1)
+  policy_working_lo_seq = Array{Array{Float64}}(T+1)
+  policy_retired_seq = Array{Array{Float64}}(T+1)
+
+  res_next = res_T
   for i in 1:T-1
     # define period
-    t = T-i
+    t = T+1-i
 
     # initialize primitives for period t
-    prim_t = Primitives(a_size=a_size)
+    prim_t = Primitives(a_size=a_size,theta=theta_seq[t])
 
     # calculate prices given K_t, L_t (guess)
     prim_t.w = (1-prim_t.alpha)*K_seq[t]^(prim_t.alpha)*L_seq[t]^(-prim_t.alpha)
@@ -88,8 +99,15 @@ function transition(steadystate_0,steadystate_T;T=30,epsilon=1e-2,max_iter=100)
 
     # solve program with initial parameters
 
-    results_t = SolveProgram(prim_t,steadyflag="no")
+    results_t = SolveProgram_trans(prim_t,res_next)
+    policy_retired_seq[t] = results_t.policy_retired
+    policy_working_hi_seq[t] = results_t.policy_working_hi
+    policy_working_lo_seq[t] = results_t.policy_working_hi
 
+    res_next = results_t
   end
+  results_1 = results_t
+
+  # Calculate sequence of aggregate K and L
 
 end
