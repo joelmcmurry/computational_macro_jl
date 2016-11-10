@@ -162,13 +162,15 @@ end
 
 #= General Equilibrium =#
 
-function compute_GE(;a_size=100,theta=0.11,z_vals=[3.0, 0.5],gamma=0.42,
-    epsilon=1e-2,max_iter=100,K0::Float64=2.0,L0::Float64=0.3)
+function compute_GE(;a_size=100,theta=0.11,n=0.011,z_vals=[3.0, 0.5],gamma=0.42,
+    epsilon=1e-2,max_iter=100,K0::Float64=2.0,L0::Float64=0.3,N::Int64=66,
+    JR::Int64=46)
 
   # Initialize primitives
-  prim = Primitives(a_size=a_size,theta=theta,gamma=gamma,z_vals=z_vals)
+  prim = Primitives(a_size=a_size,theta=theta,gamma=gamma,z_vals=z_vals,
+    N=N,JR=JR)
 
-  # Solve problem with default values
+# Solve problem with default values
   results = SolveProgram(prim)
 
   # Initialize aggregate capital and labor with Initial guess of capital and labor
@@ -467,13 +469,13 @@ end
 function create_steadystate!(prim::Primitives,res::Results)
 
   # Find relative sizes of cohorts
-  res.mu = ones(Float64,prim.N)
+  mu = ones(Float64,prim.N)
   for i in 1:prim.N-1
-    res.mu[i+1]=res.mu[i]/(1+prim.n)
+    mu[i+1]=mu[i]/(1+prim.n)
   end
 
   # Normalize so relative sizes sum to 1
-  res.mu = res.mu/(sum(res.mu))
+  res.mu = mu/(sum(mu))
 
   # Reset steady state distributions
 
