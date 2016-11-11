@@ -10,7 +10,7 @@ include("conesa_krueger_model.jl")
 
 # Initialize primitives
 
-prim = Primitives(a_size=500)
+prim = Primitives(a_size=300,a_max=30.0)
 
 # Calculate relative cohort sizes
 mu = ones(Float64,prim.N)
@@ -71,34 +71,31 @@ function transition(steadystate_0,steadystate_T;T=30,epsilon=1e-2,max_iter=100)
 
   max_dist = 100.0
 
+  # store policy functions and labor supply each period
+  policy_working_hi_seq = Array{Array{Int64}}(T)
+  policy_working_lo_seq = Array{Array{Int64}}(T)
+  policy_retired_seq = Array{Array{Int64}}(T)
+
+  labor_supply_hi_seq = Array{Array{Float64}}(T)
+  labor_supply_lo_seq = Array{Array{Float64}}(T)
+
+  # initialize last policies
+  policy_working_hi_seq[T] = res_T.policy_working_hi
+  policy_working_lo_seq[T] = res_T.policy_working_lo
+  policy_retired_seq[T] = res_T.policy_retired
+
+  labor_supply_hi_seq[T] = res_T.labor_supply_hi
+  labor_supply_lo_seq[T] = res_T.labor_supply_lo
+
+  # initialize distributions over assets
+  dist_working_hi_seq = Array{Array{Float64}}(T)
+  dist_working_lo_seq = Array{Array{Float64}}(T)
+  dist_retired_seq = Array{Array{Float64}}(T)
+
   for j in 1:max_iter
 
     # Print iteration and max distance between sequences
     println("Iter: ", j, " Max Dist.: ", max_dist)
-
-    # store policy functions and labor supply each period
-    policy_working_hi_seq = Array{Array{Int64}}(T)
-    policy_working_lo_seq = Array{Array{Int64}}(T)
-    policy_retired_seq = Array{Array{Int64}}(T)
-
-    labor_supply_hi_seq = Array{Array{Float64}}(T)
-    labor_supply_lo_seq = Array{Array{Float64}}(T)
-
-    # initialize first policies
-    # policy_working_hi_seq[1] = res_0.policy_working_hi
-    # policy_working_lo_seq[1] = res_0.policy_working_lo
-    # policy_retired_seq[1] = res_0.policy_retired
-    #
-    # labor_supply_hi_seq[1] = res_0.labor_supply_hi
-    # labor_supply_lo_seq[1] = res_0.labor_supply_lo
-
-    # initialize last policies
-    policy_working_hi_seq[T] = res_T.policy_working_hi
-    policy_working_lo_seq[T] = res_T.policy_working_lo
-    policy_retired_seq[T] = res_T.policy_retired
-
-    labor_supply_hi_seq[T] = res_T.labor_supply_hi
-    labor_supply_lo_seq[T] = res_T.labor_supply_lo
 
     res_next = res_T
     for i in 1:T-1
@@ -131,12 +128,6 @@ function transition(steadystate_0,steadystate_T;T=30,epsilon=1e-2,max_iter=100)
 
       res_next = results_t
     end
-
-    # Calculate path of distributions
-
-    dist_working_hi_seq = Array{Array{Float64}}(T)
-    dist_working_lo_seq = Array{Array{Float64}}(T)
-    dist_retired_seq = Array{Array{Float64}}(T)
 
     # initialize distribution path with original steady state
     dist_working_hi_seq[1] = res_0.ss_working_hi
@@ -202,6 +193,60 @@ function transition(steadystate_0,steadystate_T;T=30,epsilon=1e-2,max_iter=100)
     end
     toc()
 
+    # tic()
+    # for t in 2:T
+    #   dist_working_hi_seq[t][1,1] = mu[1]*prim.z_ergodic[1]
+    #   dist_working_lo_seq[t][1,1] = mu[1]*prim.z_ergodic[2]
+    #   for working_age in 2:prim.JR-1
+    #     for asset in 1:prim.a_size
+    #       for choice_index in 1:prim.a_size
+    #         if policy_working_hi_seq[t-1][asset,working_age-1] == choice_index
+    #           dist_working_hi_seq[t][choice_index,working_age] +=
+    #             (mu[working_age]/mu[working_age-1])*
+    #             dist_working_hi_seq[t-1][asset,working_age-1]*
+    #             prim.z_markov[1,1]
+    #           dist_working_lo_seq[t][choice_index,working_age] +=
+    #             (mu[working_age]/mu[working_age-1])*
+    #             dist_working_hi_seq[t-1][asset,working_age-1]*
+    #             prim.z_markov[1,2]
+    #         end
+    #         if policy_working_lo_seq[t-1][asset,working_age-1] == choice_index
+    #           dist_working_hi_seq[t][choice_index,working_age] +=
+    #             (mu[working_age]/mu[working_age-1])*
+    #             dist_working_lo_seq[t-1][asset,working_age-1]*
+    #             prim.z_markov[2,1]
+    #           dist_working_lo_seq[t][choice_index,working_age] +=
+    #             (mu[working_age]/mu[working_age-1])*
+    #             dist_working_lo_seq[t-1][asset,working_age-1]*
+    #             prim.z_markov[2,2]
+    #         end
+    #       end
+    #     end
+    #   end
+    #   for retired_age in 1:prim.N-prim.JR+1
+    #     for asset in 1:prim.a_size
+    #       for choice_index in 1:prim.a_size
+    #         if retired_age == 1
+    #           if policy_working_hi_seq[t-1][asset,prim.JR-1] == choice_index
+    #             dist_retired_seq[t][choice_index,1] +=
+    #               (mu[prim.JR]/mu[prim.JR-1])*dist_working_hi_seq[t-1][asset,prim.JR-1]
+    #           end
+    #           if policy_working_lo_seq[t-1][asset,prim.JR-1] == choice_index
+    #             dist_retired_seq[t][choice_index,1] +=
+    #               (mu[prim.JR]/mu[prim.JR-1])*dist_working_lo_seq[t-1][asset,prim.JR-1]
+    #           end
+    #         else
+    #           if policy_retired_seq[t-1][asset,retired_age-1] == choice_index
+    #               dist_retired_seq[t][choice_index,retired_age] +=
+    #                 (mu[retired_age+prim.JR-1]/mu[retired_age+prim.JR-2])*dist_retired_seq[t-1][asset,retired_age-1]
+    #           end
+    #         end
+    #       end
+    #     end
+    #   end
+    # end
+    # toc()
+
     # Calculate sequence of aggregate K and L
 
     K_seq_new = zeros(Float64,T)
@@ -249,12 +294,44 @@ function transition(steadystate_0,steadystate_T;T=30,epsilon=1e-2,max_iter=100)
     r_seq[t] = prim.alpha*K_seq[t]^(prim.alpha-1)*L_seq[t]^(1-prim.alpha) - prim.delta
   end
 
-  end
-
-  K_seq, L_seq, r_seq, w_seq
+  K_seq, L_seq, r_seq, w_seq, K_0, L_0, w_0, r_0, T
 
 end
 
 tic()
-K_seq, L_seq, r_seq, w_seq = transition(with_ss,without_ss)
+K_seq, L_seq, r_seq, w_seq, T = transition(with_ss,without_ss)
 toc()
+
+#= Graphs =#
+
+Kfig = figure()
+plot(linspace(0,T,T),K_seq,color="blue",linewidth=2.0)
+ylabel("K")
+legend(loc="lower right")
+title("Capital Transition")
+ax = PyPlot.gca()
+savefig("C:/Users/j0el/Documents/Wisconsin/899/Problem Sets/PS6/Pictures/K_transition.pgf")
+
+Lfig = figure()
+plot(linspace(0,T,T),L_seq,color="red",linewidth=2.0)
+ylabel("L")
+legend(loc="lower right")
+title("Labor Transition")
+ax = PyPlot.gca()
+savefig("C:/Users/j0el/Documents/Wisconsin/899/Problem Sets/PS6/Pictures/L_transition.pgf")
+
+rfig = figure()
+plot(linspace(0,T,T),r_seq,color="green",linewidth=2.0)
+ylabel("r")
+legend(loc="lower right")
+title("Rental Rate Transition")
+ax = PyPlot.gca()
+savefig("C:/Users/j0el/Documents/Wisconsin/899/Problem Sets/PS6/Pictures/r_transition.pgf")
+
+wfig = figure()
+plot(linspace(0,T,T),w_seq,color="yellow",linewidth=2.0)
+ylabel("w")
+legend(loc="lower right")
+title("Wage Transition")
+ax = PyPlot.gca()
+savefig("C:/Users/j0el/Documents/Wisconsin/899/Problem Sets/PS6/Pictures/r_transition.pgf")
