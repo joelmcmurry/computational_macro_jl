@@ -118,10 +118,12 @@ end
 one working year and one retired year =#
 
 function SolveProgram(prim::Primitives,return_working_age,
-    return_retired_age)
+    return_retired_age;steadyflag="yes")
     res = Results(prim)
     back_induction!(prim,res)
-    create_steadystate!(prim,res)
+    if steadyflag == "yes"
+      create_steadystate!(prim,res)
+    end
     welfare_calculation!(prim,res)
 
     v_working = hcat(res.v_working_hi[:,return_working_age],
@@ -138,24 +140,37 @@ end
 
 #= Solve model without defined return years =#
 
-function SolveProgram(prim::Primitives)
+function SolveProgram(prim::Primitives;steadyflag="yes")
     res = Results(prim)
     back_induction!(prim,res)
-    create_steadystate!(prim,res)
+    if steadyflag == "yes"
+      create_steadystate!(prim,res)
+    end
     welfare_calculation!(prim,res)
+
+    return res
+end
+
+#= Solve model with transition dynamics =#
+
+function SolveProgram_trans(prim::Primitives,res_next::Results)
+    res = Results(prim)
+    back_induction_trans!(prim,res,res_next)
 
     return res
 end
 
 #= General Equilibrium =#
 
-function compute_GE(;a_size=100,theta=0.11,z_vals=[3.0, 0.5],gamma=0.42,
-    epsilon=1e-2,max_iter=100,K0::Float64=2.0,L0::Float64=0.3)
+function compute_GE(;a_size=100,a_max=100.0,theta=0.11,n=0.011,z_vals=[3.0, 0.5],gamma=0.42,
+    epsilon=1e-2,max_iter=100,K0::Float64=2.0,L0::Float64=0.3,N::Int64=66,
+    JR::Int64=46)
 
   # Initialize primitives
-  prim = Primitives(a_size=a_size,theta=theta,gamma=gamma,z_vals=z_vals)
+  prim = Primitives(a_size=a_size,a_max=a_max,theta=theta,gamma=gamma,z_vals=z_vals,
+    N=N,JR=JR)
 
-  # Solve problem with default values
+# Solve problem with default values
   results = SolveProgram(prim)
 
   # Initialize aggregate capital and labor with Initial guess of capital and labor
@@ -339,6 +354,8 @@ end
 
 ## Backward Induction Procedures
 
+#= Steady States =#
+
 function back_induction!(prim::Primitives,res::Results)
   # Initialize terminal period value
   vN = fill(-Inf,prim.a_size)
@@ -383,18 +400,82 @@ function back_induction!(prim::Primitives,res::Results)
   res
 end
 
+#= Transition Dynamics =#
+
+function back_induction_trans!(prim::Primitives,res::Results,res_next::Results)
+  # Initialize terminal period value
+  vN = fill(-Inf,prim.a_size)
+
+  # Calculate terminal period value
+  for asset_index in 1:prim.a_size
+    a = prim.a_vals[asset_index]
+    c = (1+prim.r)*a + prim.b
+    vN[asset_index] = (1/(1-prim.sigma))*(c^((1-prim.sigma)*prim.gamma))
+  end
+  res.v_retired[:,prim.N-prim.JR+1] = vN
+  res.policy_retired[:,prim.N-prim.JR+1] = ones(prim.a_size)
+
+  #= Period t value at age j is calculated using period t+1 value at
+  age j+1 =#
+
+  # Retired
+  for i in 1:prim.N-prim.JR
+    age = prim.N - i
+    backward_index = age - prim.JR + 1
+    vnext = res_next.v_retired[:,backward_index+1]
+    age_optimization = bellman_retired!(prim,vnext)
+    res.v_retired[:,backward_index] = age_optimization[1]
+    res.policy_retired[:,backward_index] = age_optimization[2]
+  end
+
+  # Last period of working
+  age = prim.JR-1
+  backward_index = age
+  vnext = hcat(res_next.v_retired[:,1],res_next.v_retired[:,1])
+  age_optimization = bellman_working!(prim,vnext,age)
+  v_working = age_optimization[1]
+  policy_working = age_optimization[2]
+  labor_supply_working = age_optimization[3]
+  res.v_working_hi[:,backward_index] = v_working[:,1]
+  res.v_working_lo[:,backward_index] = v_working[:,2]
+  res.policy_working_hi[:,backward_index] = policy_working[:,1]
+  res.policy_working_lo[:,backward_index] = policy_working[:,2]
+  res.labor_supply_hi[:,backward_index] = labor_supply_working[:,1]
+  res.labor_supply_lo[:,backward_index] = labor_supply_working[:,2]
+
+  # Working
+  for i in 2:prim.JR-1
+    age = prim.JR - i
+    backward_index = age
+    vnext = hcat(res_next.v_working_hi[:,backward_index+1],
+      res_next.v_working_lo[:,backward_index+1])
+    age_optimization = bellman_working!(prim,vnext,age)
+    v_working = age_optimization[1]
+    policy_working = age_optimization[2]
+    labor_supply_working = age_optimization[3]
+    res.v_working_hi[:,backward_index] = v_working[:,1]
+    res.v_working_lo[:,backward_index] = v_working[:,2]
+    res.policy_working_hi[:,backward_index] = policy_working[:,1]
+    res.policy_working_lo[:,backward_index] = policy_working[:,2]
+    res.labor_supply_hi[:,backward_index] = labor_supply_working[:,1]
+    res.labor_supply_lo[:,backward_index] = labor_supply_working[:,2]
+  end
+
+  res
+end
+
 ## Stationary distribution
 
 function create_steadystate!(prim::Primitives,res::Results)
 
   # Find relative sizes of cohorts
-  res.mu = ones(Float64,prim.N)
+  mu = ones(Float64,prim.N)
   for i in 1:prim.N-1
-    res.mu[i+1]=res.mu[i]/(1+prim.n)
+    mu[i+1]=mu[i]/(1+prim.n)
   end
 
   # Normalize so relative sizes sum to 1
-  res.mu = res.mu/(sum(res.mu))
+  res.mu = mu/(sum(mu))
 
   # Reset steady state distributions
 
