@@ -33,17 +33,12 @@ function Primitives(;beta=0.99,alpha=0.36,
 
   k_vals = linspace(k_min,k_max,k_size)
   K_vals =  linspace(K_min,K_max,K_size)
-  #k_K_vals = gridmake(k_vals,K_vals)
   k_indices = gridmake(1:k_size)
   K_indices = gridmake(1:K_size)
-  #k_K_indices = gridmake(1:k_size,1:K_size)
 
   r = (alpha)*(K_vals.^(alpha-1))
   w = (1-alpha)*(K_vals.^(alpha))
 
-  # primitives = Primitives(beta,alpha,r,w,K,L,k_min,k_max,
-  #   K_min,K_max,k_size,K_size,k_vals,K_vals,k_K_vals,k_indices,
-  #   K_indices,k_K_indices)
   primitives = Primitives(beta,alpha,r,w,k_min,k_max,
     K_min,K_max,k_size,K_size,k_vals,K_vals)
 
