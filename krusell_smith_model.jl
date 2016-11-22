@@ -4,6 +4,8 @@ Creates Krusell-Smith Model and Utilities
 =#
 
 using QuantEcon: gridmake
+using Optim: optimize
+using Interpolations
 
 ## Create composite type to hold model primitives
 
@@ -19,15 +21,20 @@ type Primitives
   L :: Array{Float64} ## aggregate labor
   K_ss :: Float64 ## steady state capital without aggregate shocks
 
+  r :: Array{Float64} ## rental rate
+  w :: Array{Float64} ## wage rate
+
   k_min :: Float64 ## minimum capital value
   k_max :: Float64 ## maximum capital value
   k_size :: Int64 ## size of capital grid
   k_vals :: Vector{Float64} ## capital grid
+  itp_k :: Array ## interpolated capital grid
 
   K_min :: Float64 ## minimum aggregate capital value
   K_max :: Float64 ## maximum aggregate capital value
   K_size :: Int64 ## size of aggregate capital grid
-  K_vals :: Vector{Float64}
+  K_vals :: Vector{Float64} ## aggregate capital grid
+  itp_K :: Array ## interpolated aggregate capital grid
 
   z_size :: Int64 ## number of z shocks
   epsilon_size :: Int64 ## number of epsilon shocks
@@ -39,6 +46,12 @@ type Primitives
   N :: Int64 ## number of simulated households
   T :: Int64 ## number of simulation periods
 
+  ## capital motion approximation coefficients
+  a0::Float64
+  a1::Float64
+  b0::Float64
+  b1::Float64
+
 end
 
 #= Outer Constructor for Primitives =#
@@ -47,18 +60,30 @@ function Primitives(;beta::Float64=0.99, alpha::Float64=0.36, delta::Float64=0.0
  z::Array{Float64}=[1.01 0.99],epsilon::Array{Int64}=[0  1],
  u::Array{Float64}=[0.04 0.10], ebar::Float64=0.3271,
  k_min::Float64=0.00, k_max::Float64=15.0, k_size::Int64=100,
- N::Int64=5000,T::Int64=11000)
+ K_min::Float64=0.00, K_max::Float64=15.0, K_size::Int64=100,
+ N::Int64=5000,T::Int64=11000,a0=0.095,b0=0.085,a1=0.999,b1=0.999)
 
   # Grids
 
   k_vals = linspace(k_min, k_max, k_size)
+  K_vals = linspace(K_min, K_max, K_size)
   z_size = length(z)
   epsilon_size = length(epsilon)
   u_size = length(u)
 
-  # Aggregate labor
+  # Interpolated Grids
+
+  itp_k = interpolate(k_vals,BSpline(Linear()),OnGrid())
+  itp_K = interpolate(K_vals,BSpline(Linear()),OnGrid())
+
+  # Aggregate (inelastic) labor supply
 
   L = [1-u[1] 1-u[2]]
+
+  # prices
+
+  w = [(1-alpha)*z[1]*(K_vals./L[1]).^alpha (1-alpha)*z[2]*(K_vals./L[2]).^alpha]
+  r = [alpha*z[1]*(K_vals./L[1]).^(alpha-1) alpha*z[2]*(K_vals./L[2]).^(alpha-1)]
 
   # Initial guess for K
 
@@ -69,8 +94,9 @@ function Primitives(;beta::Float64=0.99, alpha::Float64=0.36, delta::Float64=0.0
   transmat, transmat_stat = create_transmat!(u)
 
   primitives = Primitives(beta,alpha,delta,z,epsilon,
-   u,ebar,L,K_ss,k_min,k_max,k_size,k_vals,z_size,epsilon_size,
-   u_size,transmat, transmat_stat,N,T)
+   u,ebar,L,K_ss,r,w,k_min,k_max,k_size,k_vals,itp_k,
+   K_min,K_max,K_size,K_vals,itp_K,z_size,epsilon_size,
+   u_size,transmat, transmat_stat,N,T,a0,a1,b0,b1)
 
   return primitives
 
@@ -79,56 +105,45 @@ end
 ## Type Results which holds results of the problem
 
 type Results
-    v_g::Array{Float64}
-    v_b::Array{Float64}
-    Tv_g::Array{Float64}
-    Tv_b::Array{Float64}
+    vg0::Array{Float64}
+    vb0::Array{Float64}
+    vg1::Array{Float64}
+    vb1::Array{Float64}
+    Tvg0::Array{Float64}
+    Tvb0::Array{Float64}
+    Tvg1::Array{Float64}
+    Tvb1::Array{Float64}
     num_iter::Int
-    sigma_g::Array{Int}
-    sigma_b::Array{Int}
-    w::Float64 # wage rate
-    r::Float64 # rental rate
-    K::Float64 # aggregate capital
-    a0::Float64 # log linear approximation coefficient
-    b0::Float64 # log linear approximation coefficient
-    a1::Float64 # log linear approximation coefficient
-    b1::Float64 # log linear approximation coefficient
+    sigmag0::Array{Int}
+    sigmab0::Array{Int}
+    sigmag1::Array{Int}
+    sigmab1::Array{Int}
 
-    #= Initialize K with average of the capital grid endpoints,
-    initialize prices using average z and average L =#
+    function Results(prim::Primitives)
 
-    function Results(prim::Primitives;
-      K=(prim.k_min+prim.k_max)/2,
-      w=(1-prim.alpha)*mean(prim.z)*(K/mean(prim.L))^prim.alpha,
-      r = prim.alpha*mean(prim.z)*(K/mean(prim.L))^(prim.alpha-1),
-      a0=0.095,b0=0.085,a1=0.999,b1=0.999)
+      # Initialize value with zeroes
+      vg0 = vb0 = vg1 = vb1 = zeros(prim.k_size,prim.K_size)
 
-        # Initialize value with zeroes
-        v_g = v_b = zeros(prim.k_size,prim.u_size)
+      res = new(vg0,vb0,vg1,vb1,similar(vg0),similar(vb0),
+        similar(vg1),similar(vb1),0,similar(vg0, Int),
+        similar(vb0, Int),similar(vg1, Int),similar(vb1, Int))
 
-        res = new(v_g,v_b,similar(v_g),similar(v_b),0,
-          similar(v_g, Int),similar(v_b, Int),
-          w,r,K,a0,b0,a1,b1)
-
-        res
+      res
     end
 
     # Version with supplied value functions
-    function Results(prim::Primitives,v_g::Array,v_b::Array;
-      K=(prim.k_max+prim.k_min)/2,
-      w=(1-prim.alpha)*mean(prim.z)*(K/mean(prim.L))^prim.alpha,
-      r = prim.alpha*mean(prim.z)*(K/mean(prim.L))^(prim.alpha-1),
-      a0=0.095,b0=0.085,a1=0.999,b1=0.999)
+    function Results(prim::Primitives,vg0::Array,vb0::Array,
+      vg1::Array,vb1::Array)
 
-        res = new(v_g,v_b,similar(v_g),similar(v_b),0,
-          similar(v_g, Int),similar(v_b, Int),
-          w,r,K,a0,b0,a1,b1)
+      res = new(vg0,vb0,vg1,vb1,similar(vg0),similar(vb0),
+        similar(vg1),similar(vb1),0,similar(vg0, Int),
+        similar(vb0, Int),similar(vg1, Int),similar(vb1, Int))
 
-        res
+      res
     end
 end
 
-## Solve Discrete Dynamic Program
+## Solve Program
 
 # Without initial value function (will be initialized at zeros)
 # function SolveProgram(prim::Primitives;
@@ -154,16 +169,47 @@ end
 
 ## Bellman Operator
 
-function bellman_operator!(prim::Primitives, w, r,
-  v_g::Array{Float64}, v_b::Array{Float64})
+function bellman_operator!(prim::Primitives,
+  vg0::Array{Float64},vb0::Array{Float64},
+  vg1::Array{Float64},vb1::Array{Float64})
   # initialize
-  Tv_g = fill(-Inf,(prim.k_size,prim.u_size))
-  Tv_b = fill(-Inf,(prim.k_size,prim.u_size))
-  sigma_g = zeros(prim.k_size,prim.u_size)
-  sigma_b = zeros(prim.k_size,prim.u_size)
+  Tvg0 = fill(-Inf,(prim.k_size,prim.K_size))
+  Tvb0 = fill(-Inf,(prim.k_size,prim.K_size))
+  Tvg1 = fill(-Inf,(prim.k_size,prim.K_size))
+  Tvb1 = fill(-Inf,(prim.k_size,prim.K_size))
+  sigmag0 = zeros(prim.k_size,prim.K_size)
+  sigmab0 = zeros(prim.k_size,prim.K_size)
+  sigmag1 = zeros(prim.k_size,prim.K_size)
+  sigmab1 = zeros(prim.k_size,prim.K_size)
 
-  # find max value for each (k,epsilon,z) combination
-  for  in 1:prim.s_size
+  # interpolate value functions
+  itp_vg0 = interpolate(vg0,BSpline(Cubic(Line())),OnGrid())
+  itp_vb0 = interpolate(vb0,BSpline(Cubic(Line())),OnGrid())
+  itp_vg1 = interpolate(vg1,BSpline(Cubic(Line())),OnGrid())
+  itp_vb1 = interpolate(vb1,BSpline(Cubic(Line())),OnGrid())
+
+  # find max value for each (k,K,epsilon,z) combination
+  for z_index in 1:prim.z_size
+    for eps_index in 1:prim.epsilon_size
+      for K_index in 1:prim.K_size
+
+        # approximate aggregate capital tomorrow
+        if z_index = 1
+          Kprime = prim.a0 + prim.a1*log(prim.K_vals[K_index])
+        else
+          Kprime = prim.b0 + prim.b1*log(prim.K_vals[K_index])
+        end
+
+        # find index of aggregate capital tomorrow
+        findmatch(k_index)=abs(itp_k[k_index]-prim.K_vals[K_index])
+        k_index_match = optimize(k_index->findmatch(k_index),1.0,100.0).minimum
+
+
+        for k_index in 1:prim.k_size
+        end
+      end
+    end
+  end
     s = prim.s_vals[state_index]
 
     #= exploit monotonicity of policy function and only look for
