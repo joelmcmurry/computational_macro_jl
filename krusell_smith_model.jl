@@ -28,13 +28,13 @@ type Primitives
   k_max :: Float64 ## maximum capital value
   k_size :: Int64 ## size of capital grid
   k_vals :: Vector{Float64} ## capital grid
-  itp_k :: Array ## interpolated capital grid
+  itp_k :: Interpolations.BSplineInterpolation ## interpolated capital grid
 
   K_min :: Float64 ## minimum aggregate capital value
   K_max :: Float64 ## maximum aggregate capital value
   K_size :: Int64 ## size of aggregate capital grid
   K_vals :: Vector{Float64} ## aggregate capital grid
-  itp_K :: Array ## interpolated aggregate capital grid
+  itp_K :: Interpolations.BSplineInterpolation ## interpolated aggregate capital grid
 
   z_size :: Int64 ## number of z shocks
   epsilon_size :: Int64 ## number of epsilon shocks
@@ -60,7 +60,7 @@ function Primitives(;beta::Float64=0.99, alpha::Float64=0.36, delta::Float64=0.0
  z::Array{Float64}=[1.01 0.99],epsilon::Array{Int64}=[0  1],
  u::Array{Float64}=[0.04 0.10], ebar::Float64=0.3271,
  k_min::Float64=0.00, k_max::Float64=15.0, k_size::Int64=100,
- K_min::Float64=0.00, K_max::Float64=15.0, K_size::Int64=100,
+ K_min::Float64=1.00e-10, K_max::Float64=15.0, K_size::Int64=100,
  N::Int64=5000,T::Int64=11000,a0=0.095,b0=0.085,a1=0.999,b1=0.999)
 
   # Grids
@@ -191,53 +191,90 @@ function bellman_operator!(prim::Primitives,
   # find max value for each (k,K,epsilon,z) combination
   for z_index in 1:prim.z_size
     for eps_index in 1:prim.epsilon_size
-      for K_index in 1:prim.K_size
+      # find row index of shocks for transition matrix
+      if z_index == 1 & eps_index == 2
+        shock_index = 1
+      elseif z_index == 2 & eps_index == 2
+        shock_index = 2
+      elseif z_index == 1 & eps_index == 1
+        shock_index = 3
+      elseif z_index == 2 & eps_index == 1
+        shock_index = 4
+      end
 
-        # approximate aggregate capital tomorrow
-        if z_index = 1
-          Kprime = prim.a0 + prim.a1*log(prim.K_vals[K_index])
+      for K_index in 1:prim.K_size
+        # approximate aggregate capital tomorrow (log linear form)
+        if prim.K_vals[K_index] == 0.0
+          if z_index == 1
+            Kprime = exp(prim.a0 + prim.a1*log(1e-10))
+          else
+            Kprime = exp(prim.b0 + prim.b1*log(1e-10))
+          end
         else
-          Kprime = prim.b0 + prim.b1*log(prim.K_vals[K_index])
+          if z_index == 1
+            Kprime = exp(prim.a0 + prim.a1*log(prim.K_vals[K_index]))
+          else
+            Kprime = exp(prim.b0 + prim.b1*log(prim.K_vals[K_index]))
+          end
         end
 
         # find index of aggregate capital tomorrow
-        findmatch(k_index)=abs(itp_k[k_index]-prim.K_vals[K_index])
-        k_index_match = optimize(k_index->findmatch(k_index),1.0,100.0).minimum
+        findmatch(Kprime_index)=abs(prim.itp_K[Kprime_index]-Kprime)
+        Kprime_index = optimize(Kprime_index->findmatch(Kprime_index),1.0,prim.K_size).minimum
 
+        # Option for bilinear interpolation
 
+        # for k_index in 1:prim.k_size
+        #   objective(kprime_index) = -log(prim.r[K_index]*prim.k_vals[k_index] +
+        #     prim.w[K_index]*prim.epsilon[eps_index] + (1-prim.delta)*prim.k_vals[k_index]
+        #     - itp_k[kprime_index]) -
+        #     prim.beta*
+        #     (prim.transmat[shock_index,1]*itp_vg1[kprime_index,Kprime_index]+
+        #     prim.transmat[shock_index,2]*itp_vb1[kprime_index,Kprime_index]+
+        #     prim.transmat[shock_index,3]*itp_vg0[kprime_index,Kprime_index]+
+        #     prim.transmat[shock_index,4]*itp_vb0[kprime_index,Kprime_index])
+        #   lower = 1.0
+        #   upper = findlast(kprime_index->kprime_index<prim.r[K_index]*prim.k_vals[k_index] +
+        #     prim.w[K_index]*prim.epsilon[eps_index] + (1-prim.delta)*prim.k_vals[k_index]
+        #     ,prim.itp_k)
+        #   opt_choice = optimize(kprime_index->objective(kprime_index),lower,upper)
+        #
+        #   Tv[k_index,K_index] = -objective(opt_choice.minimum)
+        #   sigma[k_index,K_index] = itp_k[opt_choice.minimum]
+        # end
+
+        # Option for grid search over k
+
+        kprime_lower = 1 # initialize lower bound of asset choices
         for k_index in 1:prim.k_size
-        end
-      end
-    end
-  end
-    s = prim.s_vals[state_index]
+          k = prim.k_vals[k_index]
 
-    #= exploit monotonicity of policy function and only look for
-    asset choices above the choice for previous asset level =#
+          max_value = -Inf # initialize value for combinations
 
-    # Initialize lower bound of asset choices
-    choice_lower = 1
-
-      for asset_index in 1:prim.a_size
-        a = prim.a_vals[asset_index]
-
-        max_value = -Inf # initialize value for (a,s) combinations
-
-          for choice_index in choice_lower:prim.a_size
-            aprime = prim.a_vals[choice_index]
-            c = s + a - prim.q*aprime
-            if c > 0
-              value = (1/(1-prim.alpha))*(1/(c^(prim.alpha-1))-1) +
-              prim.beta*dot(prim.markov[state_index,:],v[choice_index,:])
-              if value > max_value
-                max_value = value
-                sigma[asset_index,state_index] = choice_index
-                choice_lower = choice_index
+            for kprime_index in kprime_lower:prim.k_size
+              kprime = prim.k_vals[kprime_index]
+              c = prim.r[K_index]*prim.k_vals[k_index] +
+                prim.w[K_index]*prim.epsilon[eps_index] +
+                (1-prim.delta)*prim.k_vals[k_index] - kprime
+              if c > 0
+                value = log(c) -
+                    prim.beta*
+                    (prim.transmat[shock_index,1]*itp_vg1[kprime_index,Kprime_index]+
+                    prim.transmat[shock_index,2]*itp_vb1[kprime_index,Kprime_index]+
+                    prim.transmat[shock_index,3]*itp_vg0[kprime_index,Kprime_index]+
+                    prim.transmat[shock_index,4]*itp_vb0[kprime_index,Kprime_index])
+                if value > max_value
+                  max_value = value
+                  sigma[k_index,K_index] = kprime_index
+                  kprime_lower = kprime_index
+                end
               end
             end
-          end
-        Tv[asset_index,state_index] = max_value
+          Tv[k_index,K_index] = max_value
+        end
+
       end
+    end
   end
   Tv, sigma
 end
