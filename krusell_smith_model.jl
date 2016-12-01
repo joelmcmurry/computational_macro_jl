@@ -58,7 +58,7 @@ end
 #= Outer Constructor for Primitives =#
 
 function Primitives(;beta::Float64=0.99, alpha::Float64=0.36, delta::Float64=0.025,
- z::Array{Float64}=[1.01 0.99],epsilon::Array{Int64}=[0  1],
+ z::Array{Float64}=[1.01 0.99],epsilon::Array{Int64}=[1  0],
  u::Array{Float64}=[0.04 0.10], ebar::Float64=0.3271,
  k_min::Float64=1.00e-2, k_max::Float64=15.0, k_size::Int64=100,
  K_min::Float64=1.00e-2, K_max::Float64=15.0, K_size::Int64=10,
@@ -161,18 +161,18 @@ end
 
 # Without initial value function (will be initialized at zeros)
 function DecisionRules(T::Function, prim::Primitives;
-  max_iter_vfi::Integer=1000, epsilon_vfi::Real=1e-2)
+  max_iter_vfi::Integer=1000, tol_vfi::Real=1e-2)
     res = Results(prim)
-    vfi!(T, prim, res, max_iter_vfi, epsilon_vfi)
+    vfi!(T, prim, res, max_iter_vfi, tol_vfi)
     res
 end
 
 # With Initial value functions
 function DecisionRules(T::Function, prim::Primitives,
   vg1::Array, vb1::Array, vg0::Array, vb0::Array;
-  max_iter_vfi::Integer=1000, epsilon_vfi::Real=1e-2)
+  max_iter_vfi::Integer=1000, tol_vfi::Real=1e-2)
     res = Results(prim, vg1, vb1, vg0, vb0)
-    vfi!(T, prim, res, max_iter_vfi, epsilon_vfi)
+    vfi!(T, prim, res, max_iter_vfi, tol_vfi)
     res
 end
 
@@ -190,10 +190,10 @@ function bellman_operator_grid!(prim::Primitives,
   Tvb1 = fill(-Inf,prim.k_size,prim.K_size)
   Tvg0 = fill(-Inf,prim.k_size,prim.K_size)
   Tvb0 = fill(-Inf,prim.k_size,prim.K_size)
-  sigmag1 = zeros(prim.k_size,prim.K_size)
-  sigmab1 = zeros(prim.k_size,prim.K_size)
-  sigmag0 = zeros(prim.k_size,prim.K_size)
-  sigmab0 = zeros(prim.k_size,prim.K_size)
+  sigmag1 = zeros(Float64,prim.k_size,prim.K_size)
+  sigmab1 = zeros(Float64,prim.k_size,prim.K_size)
+  sigmag0 = zeros(Float64,prim.k_size,prim.K_size)
+  sigmab0 = zeros(Float64,prim.k_size,prim.K_size)
 
   # interpolate value functions
   itp_vg0 = interpolate(vg0,BSpline(Cubic(Line())),OnGrid())
@@ -201,22 +201,22 @@ function bellman_operator_grid!(prim::Primitives,
   itp_vg1 = interpolate(vg1,BSpline(Cubic(Line())),OnGrid())
   itp_vb1 = interpolate(vb1,BSpline(Cubic(Line())),OnGrid())
 
-  # find max value for each (k,K,epsilon,z) combination
+  # find max value for each (k,K,,z) combination
   for z_index in 1:prim.z_size
     for eps_index in 1:prim.epsilon_size
       # initialize floating Tv and sigma
       # Tv = ones(Float64,prim.k_size,prim.K_size)*(-2^51)
       Tv = fill(-Inf,prim.k_size,prim.K_size)
-      sigma = zeros(prim.k_size,prim.K_size)
+      sigma = zeros(Float64,prim.k_size,prim.K_size)
 
       # find row index of shocks for transition matrix
-      if z_index == 1 && eps_index == 2
+      if z_index == 1 && eps_index == 1
         shock_index = 1
-      elseif z_index == 2 && eps_index == 2
-        shock_index = 2
-      elseif z_index == 1 && eps_index == 1
-        shock_index = 3
       elseif z_index == 2 && eps_index == 1
+        shock_index = 2
+      elseif z_index == 1 && eps_index == 2
+        shock_index = 3
+      elseif z_index == 2 && eps_index == 2
         shock_index = 4
       end
 
@@ -251,7 +251,7 @@ function bellman_operator_grid!(prim::Primitives,
                     prim.transmat[shock_index,4]*itp_vb0[kprime_index,Kprime_index])
                 if value > max_value
                   max_value = value
-                  sigma[k_index,K_index] = kprime_index
+                  sigma[k_index,K_index] = prim.k_vals[kprime_index]
                   kprime_lower = kprime_index
                 end
               end
@@ -384,11 +384,11 @@ end
 ## Value Function Iteration
 
 function vfi!(T::Function, prim::Primitives, res::Results,
-  max_iter::Integer, epsilon::Real)
+  max_iter::Integer, tol::Real)
     if prim.beta == 0.0
         tol = Inf
     else
-        tol = epsilon
+        tol = tol
     end
 
     for i in 1:max_iter
