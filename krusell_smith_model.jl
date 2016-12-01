@@ -132,6 +132,10 @@ type Results
     sigmab0::Array
     sigmag1::Array
     sigmab1::Array
+    sigmag0vals::Array
+    sigmab0vals::Array
+    sigmag1vals::Array
+    sigmab1vals::Array
 
     function Results(prim::Primitives)
 
@@ -140,7 +144,9 @@ type Results
 
       res = new(vg0,vb0,vg1,vb1,similar(vg0),similar(vb0),
         similar(vg1),similar(vb1),0,similar(vg0, Int),
-        similar(vb0, Int),similar(vg1, Int),similar(vb1, Int))
+        similar(vb0, Int),similar(vg1, Int),similar(vb1, Int),
+        similar(vg0, Float64),similar(vb0, Float64),similar(vg1, Float64),
+        similar(vb1, Float64))
 
       res
     end
@@ -151,7 +157,9 @@ type Results
 
       res = new(vg0,vb0,vg1,vb1,similar(vg0),similar(vb0),
         similar(vg1),similar(vb1),0,similar(vg0, Int),
-        similar(vb0, Int),similar(vg1, Int),similar(vb1, Int))
+        similar(vb0, Int),similar(vg1, Int),similar(vb1, Int),
+        similar(vg0, Float64),similar(vb0, Float64),similar(vg1, Float64),
+        similar(vb1, Float64))
 
       res
     end
@@ -190,10 +198,14 @@ function bellman_operator_grid!(prim::Primitives,
   Tvb1 = fill(-Inf,prim.k_size,prim.K_size)
   Tvg0 = fill(-Inf,prim.k_size,prim.K_size)
   Tvb0 = fill(-Inf,prim.k_size,prim.K_size)
-  sigmag1 = zeros(Float64,prim.k_size,prim.K_size)
-  sigmab1 = zeros(Float64,prim.k_size,prim.K_size)
-  sigmag0 = zeros(Float64,prim.k_size,prim.K_size)
-  sigmab0 = zeros(Float64,prim.k_size,prim.K_size)
+  sigmag1 = zeros(Int64,prim.k_size,prim.K_size)
+  sigmab1 = zeros(Int64,prim.k_size,prim.K_size)
+  sigmag0 = zeros(Int64,prim.k_size,prim.K_size)
+  sigmab0 = zeros(Int64,prim.k_size,prim.K_size)
+  sigmag1vals = zeros(Float64,prim.k_size,prim.K_size)
+  sigmab1vals = zeros(Float64,prim.k_size,prim.K_size)
+  sigmag0vals = zeros(Float64,prim.k_size,prim.K_size)
+  sigmab0vals = zeros(Float64,prim.k_size,prim.K_size)
 
   # interpolate value functions
   itp_vg0 = interpolate(vg0,BSpline(Cubic(Line())),OnGrid())
@@ -207,7 +219,8 @@ function bellman_operator_grid!(prim::Primitives,
       # initialize floating Tv and sigma
       # Tv = ones(Float64,prim.k_size,prim.K_size)*(-2^51)
       Tv = fill(-Inf,prim.k_size,prim.K_size)
-      sigma = zeros(Float64,prim.k_size,prim.K_size)
+      sigma = zeros(Int64,prim.k_size,prim.K_size)
+      sigmavals = zeros(Float64,prim.k_size,prim.K_size)
 
       # find row index of shocks for transition matrix
       if z_index == 1 && eps_index == 1
@@ -251,7 +264,8 @@ function bellman_operator_grid!(prim::Primitives,
                     prim.transmat[shock_index,4]*itp_vb0[kprime_index,Kprime_index])
                 if value > max_value
                   max_value = value
-                  sigma[k_index,K_index] = prim.k_vals[kprime_index]
+                  sigma[k_index,K_index] = kprime_index
+                  sigmavals[k_index,K_index] = prim.k_vals[kprime_index]
                   kprime_lower = kprime_index
                 end
               end
@@ -264,19 +278,24 @@ function bellman_operator_grid!(prim::Primitives,
       if z_index == 1 && eps_index == 2
         Tvg1 = Tv
         sigmag1 = sigma
+        sigmag1vals = sigmavals
       elseif z_index == 2 && eps_index == 2
         Tvb1 = Tv
         sigmab1 = sigma
+        sigmab1vals = sigmavals
       elseif z_index == 1 && eps_index == 1
         Tvg0 = Tv
         sigmag0 = sigma
+        sigmag0vals = sigmavals
       elseif z_index == 2 && eps_index == 1
         Tvb0 = Tv
         sigmab0 = sigma
+        sigmab0vals = sigmavals
       end
     end
   end
-  Tvg1, Tvb1, Tvg0, Tvb0, sigmag1, sigmab1, sigmag0, sigmab0
+  Tvg1, Tvb1, Tvg0, Tvb0, sigmag1, sigmab1, sigmag0, sigmab0,
+  sigmag1vals, sigmab1vals, sigmag0vals, sigmab0vals
 end
 
 # Optimize over linear interpolated k
@@ -289,10 +308,14 @@ function bellman_operator_itp!(prim::Primitives,
   Tvb1 = fill(-Inf,prim.k_size,prim.K_size)
   Tvg0 = fill(-Inf,prim.k_size,prim.K_size)
   Tvb0 = fill(-Inf,prim.k_size,prim.K_size)
-  sigmag1 = zeros(Float64,prim.k_size,prim.K_size)
-  sigmab1 = zeros(Float64,prim.k_size,prim.K_size)
-  sigmag0 = zeros(Float64,prim.k_size,prim.K_size)
-  sigmab0 = zeros(Float64,prim.k_size,prim.K_size)
+  sigmag1 = zeros(Int64,prim.k_size,prim.K_size)
+  sigmab1 = zeros(Int64,prim.k_size,prim.K_size)
+  sigmag0 = zeros(Int64,prim.k_size,prim.K_size)
+  sigmab0 = zeros(Int64,prim.k_size,prim.K_size)
+  sigmag1vals = zeros(Float64,prim.k_size,prim.K_size)
+  sigmab1vals = zeros(Float64,prim.k_size,prim.K_size)
+  sigmag0vals = zeros(Float64,prim.k_size,prim.K_size)
+  sigmab0vals = zeros(Float64,prim.k_size,prim.K_size)
 
   # interpolate value functions
   itp_vg0 = interpolate(vg0,BSpline(Cubic(Line())),OnGrid())
@@ -306,7 +329,8 @@ function bellman_operator_itp!(prim::Primitives,
       # initialize floating Tv and sigma
       # Tv = ones(Float64,prim.k_size,prim.K_size)*(-2^51)
       Tv = fill(-Inf,prim.k_size,prim.K_size)
-      sigma = zeros(Float64,prim.k_size,prim.K_size)
+      sigma = zeros(Int64,prim.k_size,prim.K_size)
+      sigmavals = zeros(Float64,prim.k_size,prim.K_size)
 
       # find row index of shocks for transition matrix
       if z_index == 1 && eps_index == 2
@@ -357,7 +381,8 @@ function bellman_operator_itp!(prim::Primitives,
             end
 
             Tv[k_index,K_index] = -objective(optimizer)
-            sigma[k_index,K_index] = prim.itp_k[optimizer]
+            sigma[k_index,K_index] = optimizer
+            sigmavals[k_index,K_index] = prim.itp_k[optimizer]
           end
         end
       end
@@ -366,19 +391,24 @@ function bellman_operator_itp!(prim::Primitives,
       if z_index == 1 && eps_index == 2
         Tvg1 = Tv
         sigmag1 = sigma
+        sigmag1vals = sigmavals
       elseif z_index == 2 && eps_index == 2
         Tvb1 = Tv
         sigmab1 = sigma
+        sigmab1vals = sigmavals
       elseif z_index == 1 && eps_index == 1
         Tvg0 = Tv
         sigmag0 = sigma
+        sigmag0vals = sigmavals
       elseif z_index == 2 && eps_index == 1
         Tvb0 = Tv
         sigmab0 = sigma
+        sigmab0vals = sigmavals
       end
     end
   end
-  Tvg1, Tvb1, Tvg0, Tvb0, sigmag1, sigmab1, sigmag0, sigmab0
+  Tvg1, Tvb1, Tvg0, Tvb0, sigmag1, sigmab1, sigmag0, sigmab0,
+  sigmag1vals, sigmab1vals, sigmag0vals, sigmab0vals
 end
 
 ## Value Function Iteration
@@ -394,8 +424,9 @@ function vfi!(T::Function, prim::Primitives, res::Results,
     for i in 1:max_iter
         # updates Tv and sigma in place
         res.Tvg1, res.Tvb1, res.Tvg0, res.Tvb0,
-          res.sigmag1, res.sigmab1, res.sigmag0, res.sigmab0 =
-          T(prim,res.vg1,res.vb1,res.vg0,res.vb0)
+          res.sigmag1, res.sigmab1, res.sigmag0, res.sigmab0,
+          res.sigmag1vals, res.sigmab1vals, res.sigmag0vals,
+          res.sigmab0vals = T(prim,res.vg1,res.vb1,res.vg0,res.vb0)
 
         # compute error and update the value with Tv inside results
         errg1 = maxabs(res.Tvg1 .- res.vg1)

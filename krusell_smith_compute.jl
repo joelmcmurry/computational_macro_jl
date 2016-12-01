@@ -5,6 +5,7 @@ Runs Krusell-Smith model
 
 using PyPlot
 using Interpolations
+using GLM
 
 include("krusell_smith_model.jl")
 
@@ -74,19 +75,31 @@ function k_s_compute(prim::Primitives,operator::Function)
 
   # initialize matrix to store capital holdings
 
-  k_holdings = zeros(Float64,prim.N,prim.T)
+  # policy indices
+  k_holdings_index = zeros(Float64,prim.N,prim.T)
 
-  # initialize array to hold average capital holdings
+  # values
+  k_holdings_vals = zeros(Float64,prim.N,prim.T)
+
+  # initialize array to hold average capital holdings (values)
 
   k_avg = zeros(Float64,prim.T)
+
+  # define K value-to-index function
+  val_to_index_K(K_index,target)=abs(prim.itp_K[K_index]-target)
+
+  # find index of steady state capital in complete markets economy (K_ss)
+  target = prim.K_ss
+  K_ss_index = optimize(K_index->val_to_index_K(K_index,target),1.0,prim.K_size).minimum
 
   # endow each agent with K_ss
 
   for i in 1:prim.N
-    k_holdings[i,1] = prim.K_ss
+    k_holdings_vals[i,1] = prim.K_ss
+    k_holdings_index[i,1] = K_ss_index
   end
 
-  k_avg[1] = (1/prim.N)*sum(k_holdings[:,1])
+  k_avg[1] = (1/prim.N)*sum(k_holdings_vals[:,1])
 
   ## Calculate decision rules using chosen bellman Operator
 
@@ -98,35 +111,48 @@ function k_s_compute(prim::Primitives,operator::Function)
 
   # interpolate policy functions
 
+  # policy index
+
   itp_sigmag0 = interpolate(res.sigmag0,BSpline(Cubic(Line())),OnGrid())
   itp_sigmab0 = interpolate(res.sigmab0,BSpline(Cubic(Line())),OnGrid())
   itp_sigmag1 = interpolate(res.sigmag1,BSpline(Cubic(Line())),OnGrid())
   itp_sigmab1 = interpolate(res.sigmab1,BSpline(Cubic(Line())),OnGrid())
 
-  findmatch(k_avg_index,target)=abs(prim.itp_K[k_avg_index]-target)
+  # values
+
+  itp_sigmag0vals = interpolate(res.sigmag0vals,BSpline(Cubic(Line())),OnGrid())
+  itp_sigmab0vals = interpolate(res.sigmab0vals,BSpline(Cubic(Line())),OnGrid())
+  itp_sigmag1vals = interpolate(res.sigmag1vals,BSpline(Cubic(Line())),OnGrid())
+  itp_sigmab1vals = interpolate(res.sigmab1vals,BSpline(Cubic(Line())),OnGrid())
+
+  tic()
   for t in 1:prim.T-1
+    println("t: ", t)
     # find index of avg capital time t
     targetK = k_avg[t]
-    k_avg_index = optimize(k_avg_index->findmatch(k_avg_index,targetK),1.0,prim.K_size).minimum
+    k_avg_index = optimize(k_avg_index->val_to_index_K(k_avg_index,targetK),1.0,prim.K_size).minimum
     for i in 1:prim.N
-      targetk = k_holdings[i,t]
-      k_holdings_index = optimize(k_holdings_index->findmatch(k_holdings_index,targetk),1.0,prim.k_size).minimum
       if agg_shock_index[t] == 1 # good aggregate shock
         if idio_shock_vals[i,t] == 1.0 # employed
-          k_holdings[i,t+1] = itp_sigmag1[k_holdings_index,k_avg_index]
+          k_holdings_index[i,t+1] = itp_sigmag1[k_holdings_index[i,t],k_avg_index]
+          k_holdings_vals[i,t+1] = prim.itp_k[k_holdings_index[i,t+1]]
         else # unemployed
-          k_holdings[i,t+1] = itp_sigmag0[k_holdings_index,k_avg_index]
+          k_holdings_index[i,t+1] = itp_sigmag0[k_holdings_index[i,t],k_avg_index]
+          k_holdings_vals[i,t+1] = prim.itp_k[k_holdings_index[i,t+1]]
         end
       else  # bad aggregate shock
         if idio_shock_vals[i,t] == 1.0 # employed
-          k_holdings[i,t+1] = itp_sigmab1[k_holdings_index,k_avg_index]
+          k_holdings_index[i,t+1] = itp_sigmab1[k_holdings_index[i,t],k_avg_index]
+          k_holdings_vals[i,t+1] = prim.itp_k[k_holdings_index[i,t+1]]
         else # unemployed
-          k_holdings[i,t+1] = itp_sigmab0[k_holdings_index,k_avg_index]
+          k_holdings_index[i,t+1] = itp_sigmab0[k_holdings_index[i,t],k_avg_index]
+          k_holdings_vals[i,t+1] = prim.itp_k[k_holdings_index[i,t+1]]
         end
       end
     end
-    k_avg[t+1] = (1/prim.N)*sum(k_holdings[:,t+1])
+    k_avg[t+1] = (1/prim.N)*sum(k_holdings_vals[:,t+1])
   end
+  toc()
 
   # drop first 1000 observations
 
@@ -135,11 +161,11 @@ function k_s_compute(prim::Primitives,operator::Function)
 
   ## Regress log K' on log K to estimate forecasting coefficients
 
-  # count number of good and bad periods
+  # count number of good and bad periods (ignore last period)
 
   g_period_count = 0
   b_period_count = 0
-  for t in 1:length(agg_shock_index_trim)
+  for t in 1:length(agg_shock_index_trim)-1
     if agg_shock_index_trim[t] == 1
       g_period_count += 1
     else
@@ -167,6 +193,11 @@ function k_s_compute(prim::Primitives,operator::Function)
       b_index += 1
     end
   end
+
+  # regress log(avg k) on log(avg k')
+
+  k_avg_g_log = log(k_avg_g)
+  k_avg_b_log = log(k_avg_b)
 
 
 
