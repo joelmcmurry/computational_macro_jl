@@ -152,27 +152,24 @@ type Results
     end
 end
 
-## Solve Program
+## Generate decision rules
 
 # Without initial value function (will be initialized at zeros)
-# function SolveProgram(prim::Primitives;
-#   max_iter_vfi::Integer=500, epsilon_vfi::Real=1e-3,
-#   max_iter_statdist::Integer=500, epsilon_statdist::Real=1e-3)
-#     res = Results(prim)
-#     vfi!(prim, res, max_iter_vfi, epsilon_vfi)
-#     create_statdist!(prim, res, max_iter_statdist, epsilon_statdist)
-#     res
-# end
-#
-# # With Initial value function
-# function SolveProgram(prim::Primitives, v::Array{Float64,2};
-#   max_iter_vfi::Integer=500, epsilon_vfi::Real=1e-3,
-#   max_iter_statdist::Integer=500, epsilon_statdist::Real=1e-3)
-#     res = Results(prim, v)
-#     vfi!(prim, res, max_iter_vfi, epsilon_vfi)
-#     create_statdist!(prim, res, max_iter_statdist, epsilon_statdist)
-#     res
-# end
+function DecisionRules(T::Function, prim::Primitives;
+  max_iter_vfi::Integer=1000, epsilon_vfi::Real=1e-2)
+    res = Results(prim)
+    vfi!(T, prim, res, max_iter_vfi, epsilon_vfi)
+    res
+end
+
+# With Initial value functions
+function DecisionRules(T::Function, prim::Primitives,
+  vg1::Array, vb1::Array, vg0::Array, vb0::Array;
+  max_iter_vfi::Integer=1000, epsilon_vfi::Real=1e-2)
+    res = Results(prim, vg1, vb1, vg0, vb0)
+    vfi!(T, prim, res, max_iter_vfi, epsilon_vfi)
+    res
+end
 
 #= Internal Utilities =#
 
@@ -378,20 +375,6 @@ function bellman_operator_itp!(prim::Primitives,
   end
   Tvg1, Tvb1, Tvg0, Tvb0, sigmag1, sigmab1, sigmag0, sigmab0
 end
-
-########################SPEED TEST#######################
-
-tic()
-res=Results(prim)
-vfi!(bellman_operator_grid!,prim,res,1000,1e-1)
-toc()
-
-tic()
-res=Results(prim)
-vfi!(bellman_operator_itp!,prim,res,1000,1e-1)
-toc()
-
-#########################################################
 
 ## Value Function Iteration
 
