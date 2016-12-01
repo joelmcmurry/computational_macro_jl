@@ -6,6 +6,7 @@ Runs Krusell-Smith model
 using PyPlot
 using Interpolations
 using GLM
+using DataFrames
 
 include("krusell_smith_model.jl")
 
@@ -196,9 +197,22 @@ function k_s_compute(prim::Primitives,operator::Function)
 
   # regress log(avg k) on log(avg k')
 
-  k_avg_g_log = log(k_avg_g)
-  k_avg_b_log = log(k_avg_b)
+  data_g_log = DataFrame(Y=log(k_avg_g)[:,2],X=log(k_avg_g)[:,1])
+  data_b_log = DataFrame(Y=log(k_avg_b)[:,2],X=log(k_avg_b)[:,1])
 
+  OLS_g = glm(Y ~ X,data_g_log,Normal(),IdentityLink())
+  OLS_b = glm(Y ~ X,data_b_log,Normal(),IdentityLink())
 
+  # check parameter distance and R2
+
+  paramdist = max(maxabs([prim.a0;prim.a1]-coef(OLS_g)),
+    maxabs([prim.b0;prim.b1]-coef(OLS_b)))
+
+  r2_min = min(deviance(OLS_g),deviance(OLS_b))
+
+  ## Update guess of prediction coefficients
+
+  prim.a0, prim.a1 = coef(OLS_g)
+  prim.b0, prim.b1 = coef(OLS_b)
 
 end
