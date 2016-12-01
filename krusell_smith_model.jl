@@ -42,6 +42,7 @@ type Primitives
 
   transmat :: Array{Float64} ## transition matrix
   transmat_stat :: Array{Float64} ## stationary distribution
+  transmatagg :: Array{Float64}  ## transition matrix for aggregate shocks
 
   N :: Int64 ## number of simulated households
   T :: Int64 ## number of simulation periods
@@ -102,10 +103,14 @@ function Primitives(;beta::Float64=0.99, alpha::Float64=0.36, delta::Float64=0.0
 
   transmat, transmat_stat = create_transmat!(u)
 
+  # Create transition matrix for aggregate shocks
+
+  transmatagg = [1-(1/8) (1/8); (1/8) 1-(1/8)]
+
   primitives = Primitives(beta,alpha,delta,z,epsilon,
    u,ebar,L,K_ss,r,w,k_min,k_max,k_size,k_vals,itp_k,
    K_min,K_max,K_size,K_vals,itp_K,z_size,epsilon_size,
-   u_size,transmat, transmat_stat,N,T,a0,a1,b0,b1)
+   u_size,transmat,transmat_stat,transmatagg,N,T,a0,a1,b0,b1)
 
   return primitives
 
