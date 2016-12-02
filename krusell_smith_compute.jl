@@ -12,9 +12,10 @@ include("krusell_smith_model.jl")
 
 # initialize model primitives
 
-const prim = Primitives()
+const prim = Primitives(k_size=100)
 
-function k_s_compute(prim::Primitives,operator::Function)
+function k_s_compute(prim::Primitives,operator::Function;
+  max_iter=100,paramtol=1e-2)
 
   ## Start in the good state and simulate sequence of T aggregate shocks
 
@@ -72,147 +73,165 @@ function k_s_compute(prim::Primitives,operator::Function)
     end
   end
 
-  ## Start all agents with steady state capital holdings from complete mkt economy
+  for j in 1:max_iter
+    tic()
 
-  # initialize matrix to store capital holdings
+    ## Start all agents with steady state capital holdings from complete mkt economy
 
-  # policy indices
-  k_holdings_index = zeros(Float64,prim.N,prim.T)
+    # initialize matrix to store capital holdings
 
-  # values
-  k_holdings_vals = zeros(Float64,prim.N,prim.T)
+    # policy indices
+    k_holdings_index = zeros(Float64,prim.N,prim.T)
 
-  # initialize array to hold average capital holdings (values)
+    # values
+    k_holdings_vals = zeros(Float64,prim.N,prim.T)
 
-  k_avg = zeros(Float64,prim.T)
+    # initialize array to hold average capital holdings (values)
 
-  # define K value-to-index function
-  val_to_index_K(K_index,target)=abs(prim.itp_K[K_index]-target)
+    k_avg = zeros(Float64,prim.T)
 
-  # find index of steady state capital in complete markets economy (K_ss)
-  target = prim.K_ss
-  K_ss_index = optimize(K_index->val_to_index_K(K_index,target),1.0,prim.K_size).minimum
+    # define K value-to-index function
+    val_to_index_K(K_index,target)=abs(prim.itp_K[K_index]-target)
 
-  # endow each agent with K_ss
+    # find index of steady state capital in complete markets economy (K_ss)
+    target = prim.K_ss
+    K_ss_index = optimize(K_index->val_to_index_K(K_index,target),1.0,prim.K_size).minimum
 
-  for i in 1:prim.N
-    k_holdings_vals[i,1] = prim.K_ss
-    k_holdings_index[i,1] = K_ss_index
-  end
+    # endow each agent with K_ss
 
-  k_avg[1] = (1/prim.N)*sum(k_holdings_vals[:,1])
-
-  ## Calculate decision rules using chosen bellman Operator
-
-  # store decision rules in results object
-
-  res = DecisionRules(operator,prim)
-
-  ## Using decision rules, populate matrices
-
-  # interpolate policy functions
-
-  # policy index
-
-  itp_sigmag0 = interpolate(res.sigmag0,BSpline(Cubic(Line())),OnGrid())
-  itp_sigmab0 = interpolate(res.sigmab0,BSpline(Cubic(Line())),OnGrid())
-  itp_sigmag1 = interpolate(res.sigmag1,BSpline(Cubic(Line())),OnGrid())
-  itp_sigmab1 = interpolate(res.sigmab1,BSpline(Cubic(Line())),OnGrid())
-
-  # values
-
-  itp_sigmag0vals = interpolate(res.sigmag0vals,BSpline(Cubic(Line())),OnGrid())
-  itp_sigmab0vals = interpolate(res.sigmab0vals,BSpline(Cubic(Line())),OnGrid())
-  itp_sigmag1vals = interpolate(res.sigmag1vals,BSpline(Cubic(Line())),OnGrid())
-  itp_sigmab1vals = interpolate(res.sigmab1vals,BSpline(Cubic(Line())),OnGrid())
-
-  tic()
-  for t in 1:prim.T-1
-    println("t: ", t)
-    # find index of avg capital time t
-    targetK = k_avg[t]
-    k_avg_index = optimize(k_avg_index->val_to_index_K(k_avg_index,targetK),1.0,prim.K_size).minimum
     for i in 1:prim.N
-      if agg_shock_index[t] == 1 # good aggregate shock
-        if idio_shock_vals[i,t] == 1.0 # employed
-          k_holdings_index[i,t+1] = itp_sigmag1[k_holdings_index[i,t],k_avg_index]
-          k_holdings_vals[i,t+1] = prim.itp_k[k_holdings_index[i,t+1]]
-        else # unemployed
-          k_holdings_index[i,t+1] = itp_sigmag0[k_holdings_index[i,t],k_avg_index]
-          k_holdings_vals[i,t+1] = prim.itp_k[k_holdings_index[i,t+1]]
-        end
-      else  # bad aggregate shock
-        if idio_shock_vals[i,t] == 1.0 # employed
-          k_holdings_index[i,t+1] = itp_sigmab1[k_holdings_index[i,t],k_avg_index]
-          k_holdings_vals[i,t+1] = prim.itp_k[k_holdings_index[i,t+1]]
-        else # unemployed
-          k_holdings_index[i,t+1] = itp_sigmab0[k_holdings_index[i,t],k_avg_index]
-          k_holdings_vals[i,t+1] = prim.itp_k[k_holdings_index[i,t+1]]
+      k_holdings_vals[i,1] = prim.K_ss
+      k_holdings_index[i,1] = K_ss_index
+    end
+
+    k_avg[1] = (1/prim.N)*sum(k_holdings_vals[:,1])
+
+    ## Calculate decision rules using chosen bellman Operator
+
+    # store decision rules in results object
+
+    res = DecisionRules(operator,prim)
+
+    ## Using decision rules, populate matrices
+
+    # interpolate policy functions
+
+    # policy index
+
+    itp_sigmag0 = interpolate(res.sigmag0,BSpline(Cubic(Line())),OnGrid())
+    itp_sigmab0 = interpolate(res.sigmab0,BSpline(Cubic(Line())),OnGrid())
+    itp_sigmag1 = interpolate(res.sigmag1,BSpline(Cubic(Line())),OnGrid())
+    itp_sigmab1 = interpolate(res.sigmab1,BSpline(Cubic(Line())),OnGrid())
+
+    # values
+
+    itp_sigmag0vals = interpolate(res.sigmag0vals,BSpline(Cubic(Line())),OnGrid())
+    itp_sigmab0vals = interpolate(res.sigmab0vals,BSpline(Cubic(Line())),OnGrid())
+    itp_sigmag1vals = interpolate(res.sigmag1vals,BSpline(Cubic(Line())),OnGrid())
+    itp_sigmab1vals = interpolate(res.sigmab1vals,BSpline(Cubic(Line())),OnGrid())
+
+    #tic()
+    for t in 1:prim.T-1
+      #println("t: ", t)
+      # find index of avg capital time t
+      targetK = k_avg[t]
+      k_avg_index = optimize(k_avg_index->val_to_index_K(k_avg_index,targetK),1.0,prim.K_size).minimum
+      for i in 1:prim.N
+        if agg_shock_index[t] == 1 # good aggregate shock
+          if idio_shock_vals[i,t] == 1.0 # employed
+            k_holdings_index[i,t+1] = itp_sigmag1[k_holdings_index[i,t],k_avg_index]
+            k_holdings_vals[i,t+1] = prim.itp_k[k_holdings_index[i,t+1]]
+          else # unemployed
+            k_holdings_index[i,t+1] = itp_sigmag0[k_holdings_index[i,t],k_avg_index]
+            k_holdings_vals[i,t+1] = prim.itp_k[k_holdings_index[i,t+1]]
+          end
+        else  # bad aggregate shock
+          if idio_shock_vals[i,t] == 1.0 # employed
+            k_holdings_index[i,t+1] = itp_sigmab1[k_holdings_index[i,t],k_avg_index]
+            k_holdings_vals[i,t+1] = prim.itp_k[k_holdings_index[i,t+1]]
+          else # unemployed
+            k_holdings_index[i,t+1] = itp_sigmab0[k_holdings_index[i,t],k_avg_index]
+            k_holdings_vals[i,t+1] = prim.itp_k[k_holdings_index[i,t+1]]
+          end
         end
       end
+      k_avg[t+1] = (1/prim.N)*sum(k_holdings_vals[:,t+1])
     end
-    k_avg[t+1] = (1/prim.N)*sum(k_holdings_vals[:,t+1])
-  end
-  toc()
+    #toc()
 
-  # drop first 1000 observations
+    # drop first 1000 observations
 
-  k_avg_trim = k_avg[1001:prim.T]
-  agg_shock_index_trim = agg_shock_index[1001:prim.T]
+    k_avg_trim = k_avg[1001:prim.T]
+    agg_shock_index_trim = agg_shock_index[1001:prim.T]
 
-  ## Regress log K' on log K to estimate forecasting coefficients
+    ## Regress log K' on log K to estimate forecasting coefficients
 
-  # count number of good and bad periods (ignore last period)
+    # count number of good and bad periods (ignore last period)
 
-  g_period_count = 0
-  b_period_count = 0
-  for t in 1:length(agg_shock_index_trim)-1
-    if agg_shock_index_trim[t] == 1
-      g_period_count += 1
-    else
-      b_period_count += 1
+    g_period_count = 0
+    b_period_count = 0
+    for t in 1:length(agg_shock_index_trim)-1
+      if agg_shock_index_trim[t] == 1
+        g_period_count += 1
+      else
+        b_period_count += 1
+      end
     end
-  end
 
-  # split (avg k,avg k') into two datasets: good and bad periods
+    # split (avg k,avg k') into two datasets: good and bad periods
 
-  k_avg_g = zeros(Float64,g_period_count,2)
-  k_avg_b = zeros(Float64,b_period_count,2)
+    k_avg_g = zeros(Float64,g_period_count,2)
+    k_avg_b = zeros(Float64,b_period_count,2)
 
-  # populate (avg k,avg k') in each datasets
+    # populate (avg k,avg k') in each datasets
 
-  g_index = 1
-  b_index = 1
-  for t in 1:length(agg_shock_index_trim)-1
-    if agg_shock_index_trim[t] == 1
-      k_avg_g[g_index,1] = k_avg_trim[t]
-      k_avg_g[g_index,2] = k_avg_trim[t+1]
-      g_index += 1
-    else
-      k_avg_b[b_index,1] = k_avg_trim[t]
-      k_avg_b[b_index,2] = k_avg_trim[t+1]
-      b_index += 1
+    g_index = 1
+    b_index = 1
+    for t in 1:length(agg_shock_index_trim)-1
+      if agg_shock_index_trim[t] == 1
+        k_avg_g[g_index,1] = k_avg_trim[t]
+        k_avg_g[g_index,2] = k_avg_trim[t+1]
+        g_index += 1
+      else
+        k_avg_b[b_index,1] = k_avg_trim[t]
+        k_avg_b[b_index,2] = k_avg_trim[t+1]
+        b_index += 1
+      end
     end
+
+    # regress log(avg k) on log(avg k')
+
+    data_g_log = DataFrame(Y=log(k_avg_g)[:,2],X=log(k_avg_g)[:,1])
+    data_b_log = DataFrame(Y=log(k_avg_b)[:,2],X=log(k_avg_b)[:,1])
+
+    OLS_g = glm(Y ~ X,data_g_log,Normal(),IdentityLink())
+    OLS_b = glm(Y ~ X,data_b_log,Normal(),IdentityLink())
+
+    # check parameter distance and R2
+
+    paramdist = max(maxabs([prim.a0;prim.a1]-coef(OLS_g)),
+      maxabs([prim.b0;prim.b1]-coef(OLS_b)))
+
+    r2_g = deviance(OLS_g)
+    r2_b = deviance(OLS_b)
+
+    println("Iter Completed: ",j," paramdist: ", paramdist,
+      " r2_g: ", r2_g, " r2_b: ", r2_b)
+    toc()
+
+    if paramdist < paramtol || r2_g >= 0.99 && r2_b >= 0.99
+      break
+    end
+
+    ## Update guess of prediction coefficients
+
+    prim.a0, prim.a1 = coef(OLS_g)
+    prim.b0, prim.b1 = coef(OLS_b)
+
   end
-
-  # regress log(avg k) on log(avg k')
-
-  data_g_log = DataFrame(Y=log(k_avg_g)[:,2],X=log(k_avg_g)[:,1])
-  data_b_log = DataFrame(Y=log(k_avg_b)[:,2],X=log(k_avg_b)[:,1])
-
-  OLS_g = glm(Y ~ X,data_g_log,Normal(),IdentityLink())
-  OLS_b = glm(Y ~ X,data_b_log,Normal(),IdentityLink())
-
-  # check parameter distance and R2
-
-  paramdist = max(maxabs([prim.a0;prim.a1]-coef(OLS_g)),
-    maxabs([prim.b0;prim.b1]-coef(OLS_b)))
-
-  r2_min = min(deviance(OLS_g),deviance(OLS_b))
-
-  ## Update guess of prediction coefficients
-
-  prim.a0, prim.a1 = coef(OLS_g)
-  prim.b0, prim.b1 = coef(OLS_b)
-
+  prim, res, k_avg_trim, r2_g, r2_b
 end
+
+tic()
+prim, res, k_avg_trim, r2_g, r2_b = k_s_compute(prim,bellman_operator_grid!)
+toc()

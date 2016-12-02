@@ -435,7 +435,7 @@ function vfi!(T::Function, prim::Primitives, res::Results,
         errb0 = maxabs(res.Tvb0 .- res.vb0)
         err = max(errg1,errg0,errb1,errb0)
 
-        println("Iter: ", res.num_iter, " error: ", err)
+        #println("Iter: ", res.num_iter, " error: ", err)
 
         res.vg1 = res.Tvg1
         res.vg0 = res.Tvg0
