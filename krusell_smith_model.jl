@@ -208,10 +208,10 @@ function bellman_operator_grid!(prim::Primitives,
   sigmab0vals = zeros(Float64,prim.k_size,prim.K_size)
 
   # interpolate value functions
-  itp_vg0 = interpolate(vg0,BSpline(Cubic(Line())),OnGrid())
-  itp_vb0 = interpolate(vb0,BSpline(Cubic(Line())),OnGrid())
-  itp_vg1 = interpolate(vg1,BSpline(Cubic(Line())),OnGrid())
-  itp_vb1 = interpolate(vb1,BSpline(Cubic(Line())),OnGrid())
+  itp_vg0 = interpolate(vg0,BSpline(Linear()),OnGrid())
+  itp_vb0 = interpolate(vb0,BSpline(Linear()),OnGrid())
+  itp_vg1 = interpolate(vg1,BSpline(Linear()),OnGrid())
+  itp_vb1 = interpolate(vb1,BSpline(Linear()),OnGrid())
 
   # find max value for each (k,K,,z) combination
   for z_index in 1:prim.z_size
@@ -240,7 +240,6 @@ function bellman_operator_grid!(prim::Primitives,
         else
           Kprime = exp(prim.b0 + prim.b1*log(prim.K_vals[K_index]))
         end
-
 
         # find index of aggregate capital tomorrow
         findmatch(Kprime_index)=abs(prim.itp_K[Kprime_index]-Kprime)
@@ -275,19 +274,19 @@ function bellman_operator_grid!(prim::Primitives,
       end
 
       # fill in proper Tv and sigma
-      if z_index == 1 && eps_index == 2
+      if z_index == 1 && eps_index == 1
         Tvg1 = Tv
         sigmag1 = sigma
         sigmag1vals = sigmavals
-      elseif z_index == 2 && eps_index == 2
+      elseif z_index == 2 && eps_index == 1
         Tvb1 = Tv
         sigmab1 = sigma
         sigmab1vals = sigmavals
-      elseif z_index == 1 && eps_index == 1
+      elseif z_index == 1 && eps_index == 2
         Tvg0 = Tv
         sigmag0 = sigma
         sigmag0vals = sigmavals
-      elseif z_index == 2 && eps_index == 1
+      elseif z_index == 2 && eps_index == 2
         Tvb0 = Tv
         sigmab0 = sigma
         sigmab0vals = sigmavals
@@ -308,20 +307,20 @@ function bellman_operator_itp!(prim::Primitives,
   Tvb1 = fill(-Inf,prim.k_size,prim.K_size)
   Tvg0 = fill(-Inf,prim.k_size,prim.K_size)
   Tvb0 = fill(-Inf,prim.k_size,prim.K_size)
-  sigmag1 = zeros(Int64,prim.k_size,prim.K_size)
-  sigmab1 = zeros(Int64,prim.k_size,prim.K_size)
-  sigmag0 = zeros(Int64,prim.k_size,prim.K_size)
-  sigmab0 = zeros(Int64,prim.k_size,prim.K_size)
+  sigmag1 = zeros(Float64,prim.k_size,prim.K_size)
+  sigmab1 = zeros(Float64,prim.k_size,prim.K_size)
+  sigmag0 = zeros(Float64,prim.k_size,prim.K_size)
+  sigmab0 = zeros(Float64,prim.k_size,prim.K_size)
   sigmag1vals = zeros(Float64,prim.k_size,prim.K_size)
   sigmab1vals = zeros(Float64,prim.k_size,prim.K_size)
   sigmag0vals = zeros(Float64,prim.k_size,prim.K_size)
   sigmab0vals = zeros(Float64,prim.k_size,prim.K_size)
 
   # interpolate value functions
-  itp_vg0 = interpolate(vg0,BSpline(Cubic(Line())),OnGrid())
-  itp_vb0 = interpolate(vb0,BSpline(Cubic(Line())),OnGrid())
-  itp_vg1 = interpolate(vg1,BSpline(Cubic(Line())),OnGrid())
-  itp_vb1 = interpolate(vb1,BSpline(Cubic(Line())),OnGrid())
+  itp_vg0 = interpolate(vg0,BSpline(Linear()),OnGrid())
+  itp_vb0 = interpolate(vb0,BSpline(Linear()),OnGrid())
+  itp_vg1 = interpolate(vg1,BSpline(Linear()),OnGrid())
+  itp_vb1 = interpolate(vb1,BSpline(Linear()),OnGrid())
 
   # find max value for each (k,K,epsilon,z) combination
   for z_index in 1:prim.z_size
@@ -329,17 +328,17 @@ function bellman_operator_itp!(prim::Primitives,
       # initialize floating Tv and sigma
       # Tv = ones(Float64,prim.k_size,prim.K_size)*(-2^51)
       Tv = fill(-Inf,prim.k_size,prim.K_size)
-      sigma = zeros(Int64,prim.k_size,prim.K_size)
+      sigma = zeros(Float64,prim.k_size,prim.K_size)
       sigmavals = zeros(Float64,prim.k_size,prim.K_size)
 
       # find row index of shocks for transition matrix
-      if z_index == 1 && eps_index == 2
+      if z_index == 1 && eps_index == 1
         shock_index = 1
-      elseif z_index == 2 && eps_index == 2
-        shock_index = 2
-      elseif z_index == 1 && eps_index == 1
-        shock_index = 3
       elseif z_index == 2 && eps_index == 1
+        shock_index = 2
+      elseif z_index == 1 && eps_index == 2
+        shock_index = 3
+      elseif z_index == 2 && eps_index == 2
         shock_index = 4
       end
 
@@ -351,18 +350,17 @@ function bellman_operator_itp!(prim::Primitives,
           Kprime = exp(prim.b0 + prim.b1*log(prim.K_vals[K_index]))
         end
 
-
         # find index of aggregate capital tomorrow
         findmatch(Kprime_index)=abs(prim.itp_K[Kprime_index]-Kprime)
         Kprime_index = optimize(Kprime_index->findmatch(Kprime_index),1.0,prim.K_size).minimum
 
         for k_index in 1:prim.k_size
-          if prim.r[K_index]*prim.k_vals[k_index] +
-            prim.w[K_index]*prim.epsilon[eps_index] +
+          if prim.r[K_index,z_index]*prim.k_vals[k_index] +
+            prim.w[K_index,z_index]*prim.epsilon[eps_index] +
             (1-prim.delta)*prim.k_vals[k_index] > 0
 
-            objective(kprime_index) = -log(prim.r[K_index]*prim.k_vals[k_index] +
-              prim.w[K_index]*prim.epsilon[eps_index] + (1-prim.delta)*prim.k_vals[k_index]
+            objective(kprime_index) = -log(prim.r[K_index,z_index]*prim.k_vals[k_index] +
+              prim.w[K_index,z_index]*prim.epsilon[eps_index] + (1-prim.delta)*prim.k_vals[k_index]
               - prim.itp_k[kprime_index]) -
               prim.beta*
               (prim.transmat[shock_index,1]*itp_vg1[kprime_index,Kprime_index]+
@@ -370,8 +368,8 @@ function bellman_operator_itp!(prim::Primitives,
               prim.transmat[shock_index,3]*itp_vg0[kprime_index,Kprime_index]+
               prim.transmat[shock_index,4]*itp_vb0[kprime_index,Kprime_index])
             lower = 1.0
-            upper = findlast(kprime_index->kprime_index<=prim.r[K_index]*prim.k_vals[k_index] +
-              prim.w[K_index]*prim.epsilon[eps_index] + (1-prim.delta)*prim.k_vals[k_index]
+            upper = findlast(kprime_index->kprime_index<=prim.r[K_index,z_index]*prim.k_vals[k_index] +
+              prim.w[K_index,z_index]*prim.epsilon[eps_index] + (1-prim.delta)*prim.k_vals[k_index]
               ,prim.itp_k)
             if lower < upper
               optimization = optimize(kprime_index->objective(kprime_index),lower,upper)
@@ -388,19 +386,19 @@ function bellman_operator_itp!(prim::Primitives,
       end
 
       # fill in proper Tv and sigma
-      if z_index == 1 && eps_index == 2
+      if z_index == 1 && eps_index == 1
         Tvg1 = Tv
         sigmag1 = sigma
         sigmag1vals = sigmavals
-      elseif z_index == 2 && eps_index == 2
+      elseif z_index == 2 && eps_index == 1
         Tvb1 = Tv
         sigmab1 = sigma
         sigmab1vals = sigmavals
-      elseif z_index == 1 && eps_index == 1
+      elseif z_index == 1 && eps_index == 2
         Tvg0 = Tv
         sigmag0 = sigma
         sigmag0vals = sigmavals
-      elseif z_index == 2 && eps_index == 1
+      elseif z_index == 2 && eps_index == 2
         Tvb0 = Tv
         sigmab0 = sigma
         sigmab0vals = sigmavals

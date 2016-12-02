@@ -12,10 +12,10 @@ include("krusell_smith_model.jl")
 
 # initialize model primitives
 
-const prim = Primitives(k_size=100)
+const prim = Primitives(k_size=50)
 
 function k_s_compute(prim::Primitives,operator::Function;
-  max_iter=100,paramtol=1e-2)
+  max_iter=100,paramtol=1e-4)
 
   ## Start in the good state and simulate sequence of T aggregate shocks
 
@@ -73,6 +73,18 @@ function k_s_compute(prim::Primitives,operator::Function;
     end
   end
 
+  ## Calculate decision rules using chosen bellman operator
+
+  res = DecisionRules(operator,prim)
+
+  # Initialize Output Objects
+
+  k_holdings_index = zeros(Float64,prim.N,prim.T)
+  k_holdings_vals = zeros(Float64,prim.N,prim.T)
+  k_avg = zeros(Float64,prim.T)
+  r2_g = 0.0
+  r2_b = 0.0
+
   for j in 1:max_iter
     tic()
 
@@ -106,29 +118,23 @@ function k_s_compute(prim::Primitives,operator::Function;
 
     k_avg[1] = (1/prim.N)*sum(k_holdings_vals[:,1])
 
-    ## Calculate decision rules using chosen bellman Operator
-
-    # store decision rules in results object
-
-    res = DecisionRules(operator,prim)
-
     ## Using decision rules, populate matrices
 
     # interpolate policy functions
 
     # policy index
 
-    itp_sigmag0 = interpolate(res.sigmag0,BSpline(Cubic(Line())),OnGrid())
-    itp_sigmab0 = interpolate(res.sigmab0,BSpline(Cubic(Line())),OnGrid())
-    itp_sigmag1 = interpolate(res.sigmag1,BSpline(Cubic(Line())),OnGrid())
-    itp_sigmab1 = interpolate(res.sigmab1,BSpline(Cubic(Line())),OnGrid())
+    itp_sigmag0 = interpolate(res.sigmag0,BSpline(Linear()),OnGrid())
+    itp_sigmab0 = interpolate(res.sigmab0,BSpline(Linear()),OnGrid())
+    itp_sigmag1 = interpolate(res.sigmag1,BSpline(Linear()),OnGrid())
+    itp_sigmab1 = interpolate(res.sigmab1,BSpline(Linear()),OnGrid())
 
     # values
 
-    itp_sigmag0vals = interpolate(res.sigmag0vals,BSpline(Cubic(Line())),OnGrid())
-    itp_sigmab0vals = interpolate(res.sigmab0vals,BSpline(Cubic(Line())),OnGrid())
-    itp_sigmag1vals = interpolate(res.sigmag1vals,BSpline(Cubic(Line())),OnGrid())
-    itp_sigmab1vals = interpolate(res.sigmab1vals,BSpline(Cubic(Line())),OnGrid())
+    itp_sigmag0vals = interpolate(res.sigmag0vals,BSpline(Linear()),OnGrid())
+    itp_sigmab0vals = interpolate(res.sigmab0vals,BSpline(Linear()),OnGrid())
+    itp_sigmag1vals = interpolate(res.sigmag1vals,BSpline(Linear()),OnGrid())
+    itp_sigmab1vals = interpolate(res.sigmab1vals,BSpline(Linear()),OnGrid())
 
     #tic()
     for t in 1:prim.T-1
@@ -228,10 +234,14 @@ function k_s_compute(prim::Primitives,operator::Function;
     prim.a0, prim.a1 = coef(OLS_g)
     prim.b0, prim.b1 = coef(OLS_b)
 
+    ## Recalculate decision rules with new prediction coefficients
+
+    res = DecisionRules(operator,prim)
+
   end
-  prim, res, k_avg_trim, r2_g, r2_b
+  prim, res, k_holdings_vals, k_holdings_index, k_avg, r2_g, r2_b
 end
 
 tic()
-prim, res, k_avg_trim, r2_g, r2_b = k_s_compute(prim,bellman_operator_grid!)
+prim, res, k_holdings_vals, k_holdings_index, k_avg, r2_g, r2_b = k_s_compute(prim,bellman_operator_itp!)
 toc()
