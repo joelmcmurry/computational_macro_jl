@@ -5,17 +5,15 @@ Runs Krusell-Smith model
 
 using PyPlot
 using Interpolations
-using GLM
-using DataFrames
 
 include("krusell_smith_model.jl")
 
 # initialize model primitives
 
-const prim = Primitives(k_size=50)
+const prim = Primitives(k_size=1800)
 
 function k_s_compute(prim::Primitives,operator::Function;
-  max_iter=100,paramtol=1e-4)
+  max_iter=100,paramtol=1e-8)
 
   ## Start in the good state and simulate sequence of T aggregate shocks
 
@@ -146,18 +144,22 @@ function k_s_compute(prim::Primitives,operator::Function;
         if agg_shock_index[t] == 1 # good aggregate shock
           if idio_shock_vals[i,t] == 1.0 # employed
             k_holdings_index[i,t+1] = itp_sigmag1[k_holdings_index[i,t],k_avg_index]
-            k_holdings_vals[i,t+1] = prim.itp_k[k_holdings_index[i,t+1]]
+            k_holdings_vals[i,t+1] = itp_sigmag1vals[k_holdings_index[i,t],k_avg_index]
+            #k_holdings_vals[i,t+1] = prim.itp_k[k_holdings_index[i,t+1]]
           else # unemployed
             k_holdings_index[i,t+1] = itp_sigmag0[k_holdings_index[i,t],k_avg_index]
-            k_holdings_vals[i,t+1] = prim.itp_k[k_holdings_index[i,t+1]]
+            k_holdings_vals[i,t+1] = itp_sigmag0vals[k_holdings_index[i,t],k_avg_index]
+            #k_holdings_vals[i,t+1] = prim.itp_k[k_holdings_index[i,t+1]]
           end
         else  # bad aggregate shock
           if idio_shock_vals[i,t] == 1.0 # employed
             k_holdings_index[i,t+1] = itp_sigmab1[k_holdings_index[i,t],k_avg_index]
-            k_holdings_vals[i,t+1] = prim.itp_k[k_holdings_index[i,t+1]]
+            k_holdings_vals[i,t+1] = itp_sigmab1vals[k_holdings_index[i,t],k_avg_index]
+            #k_holdings_vals[i,t+1] = prim.itp_k[k_holdings_index[i,t+1]]
           else # unemployed
             k_holdings_index[i,t+1] = itp_sigmab0[k_holdings_index[i,t],k_avg_index]
-            k_holdings_vals[i,t+1] = prim.itp_k[k_holdings_index[i,t+1]]
+            k_holdings_vals[i,t+1] = itp_sigmab0vals[k_holdings_index[i,t],k_avg_index]
+            #k_holdings_vals[i,t+1] = prim.itp_k[k_holdings_index[i,t+1]]
           end
         end
       end
@@ -207,23 +209,30 @@ function k_s_compute(prim::Primitives,operator::Function;
 
     # regress log(avg k) on log(avg k')
 
-    data_g_log = DataFrame(Y=log(k_avg_g)[:,2],X=log(k_avg_g)[:,1])
-    data_b_log = DataFrame(Y=log(k_avg_b)[:,2],X=log(k_avg_b)[:,1])
+    data_g_log = log(k_avg_g)
+    data_b_log = log(k_avg_b)
 
-    OLS_g = glm(Y ~ X,data_g_log,Normal(),IdentityLink())
-    OLS_b = glm(Y ~ X,data_b_log,Normal(),IdentityLink())
+    OLS_g = linreg(data_g_log[:,1],data_g_log[:,2])
+    OLS_b = linreg(data_b_log[:,1],data_b_log[:,2])
+
+    # calculate R^2
+
+    fitted_g = OLS_g[1] + OLS_g[2]*data_g_log[:,1]
+    fitted_b = OLS_b[1] + OLS_b[2]*data_b_log[:,1]
+
+    residual_g = data_g_log[:,2] - fitted_g
+    residual_b = data_b_log[:,2] - fitted_b
+
+    r2_g = 1 - sum(residual_g.^2)/sum((data_g_log[:,2]-mean(data_g_log[:,2])).^2)
+    r2_b = 1 - sum(residual_g.^2)/sum((data_b_log[:,2]-mean(data_b_log[:,2])).^2)
 
     # check parameter distance and R2
 
-    paramdist = max(maxabs([prim.a0;prim.a1]-coef(OLS_g)),
-      maxabs([prim.b0;prim.b1]-coef(OLS_b)))
-
-    r2_g = deviance(OLS_g)
-    r2_b = deviance(OLS_b)
+    paramdist = max(maxabs([prim.a0;prim.a1]-[OLS_g[1];OLS_g[2]]),
+      maxabs([prim.b0;prim.b1]-[OLS_b[1];OLS_b[2]]))
 
     println("Iter Completed: ",j," paramdist: ", paramdist,
       " r2_g: ", r2_g, " r2_b: ", r2_b)
-    toc()
 
     if paramdist < paramtol || r2_g >= 0.99 && r2_b >= 0.99
       break
@@ -231,17 +240,18 @@ function k_s_compute(prim::Primitives,operator::Function;
 
     ## Update guess of prediction coefficients
 
-    prim.a0, prim.a1 = coef(OLS_g)
-    prim.b0, prim.b1 = coef(OLS_b)
+    prim.a0, prim.a1 = OLS_g
+    prim.b0, prim.b1 = OLS_b
 
     ## Recalculate decision rules with new prediction coefficients
 
     res = DecisionRules(operator,prim)
+    toc()
 
   end
   prim, res, k_holdings_vals, k_holdings_index, k_avg, r2_g, r2_b
 end
 
 tic()
-prim, res, k_holdings_vals, k_holdings_index, k_avg, r2_g, r2_b = k_s_compute(prim,bellman_operator_itp!)
+prim, res, k_holdings_vals, k_holdings_index, k_avg, r2_g, r2_b = k_s_compute(prim,bellman_operator_grid!)
 toc()
