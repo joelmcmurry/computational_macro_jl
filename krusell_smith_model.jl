@@ -79,7 +79,7 @@ function Primitives(;beta::Float64=0.99, alpha::Float64=0.36, delta::Float64=0.0
 
   # Aggregate (inelastic) labor supply
 
-  L = [1-u[1] 1-u[2]]
+  L = [1-u[1] 1-u[2]]*ebar
 
   # prices
 
@@ -252,7 +252,7 @@ function bellman_operator_grid!(prim::Primitives,
 
             for kprime_index in kprime_lower:prim.k_size
               c = prim.r[K_index,z_index]*prim.k_vals[k_index] +
-                prim.w[K_index,z_index]*prim.epsilon[eps_index] +
+                prim.w[K_index,z_index]*prim.ebar*prim.epsilon[eps_index] +
                 (1-prim.delta)*prim.k_vals[k_index] - prim.k_vals[kprime_index]
               if c > 0
                 value = log(c) +
@@ -356,12 +356,12 @@ function bellman_operator_itp!(prim::Primitives,
 
         for k_index in 1:prim.k_size
           if prim.r[K_index,z_index]*prim.k_vals[k_index] +
-            prim.w[K_index,z_index]*prim.epsilon[eps_index] +
+            prim.w[K_index,z_index]*prim.ebar*prim.epsilon[eps_index] +
             (1-prim.delta)*prim.k_vals[k_index] > 0
 
             objective(kprime_index) = -log(prim.r[K_index,z_index]*prim.k_vals[k_index] +
-              prim.w[K_index,z_index]*prim.epsilon[eps_index] + (1-prim.delta)*prim.k_vals[k_index]
-              - prim.itp_k[kprime_index]) -
+              prim.w[K_index,z_index]*prim.ebar*prim.epsilon[eps_index] +
+              (1-prim.delta)*prim.k_vals[k_index] - prim.itp_k[kprime_index]) -
               prim.beta*
               (prim.transmat[shock_index,1]*itp_vg1[kprime_index,Kprime_index]+
               prim.transmat[shock_index,2]*itp_vb1[kprime_index,Kprime_index]+
@@ -369,8 +369,8 @@ function bellman_operator_itp!(prim::Primitives,
               prim.transmat[shock_index,4]*itp_vb0[kprime_index,Kprime_index])
             lower = 1.0
             upper = findlast(kprime_index->kprime_index<=prim.r[K_index,z_index]*prim.k_vals[k_index] +
-              prim.w[K_index,z_index]*prim.epsilon[eps_index] + (1-prim.delta)*prim.k_vals[k_index]
-              ,prim.itp_k)
+              prim.w[K_index,z_index]*prim.ebar*prim.epsilon[eps_index] +
+              (1-prim.delta)*prim.k_vals[k_index],prim.itp_k)
             if lower < upper
               optimization = optimize(kprime_index->objective(kprime_index),lower,upper)
               optimizer = optimization.minimum

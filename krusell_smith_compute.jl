@@ -10,10 +10,10 @@ include("krusell_smith_model.jl")
 
 # initialize model primitives
 
-const prim = Primitives(k_size=1000)
+const prim = Primitives(k_size=500)
 
 function k_s_compute(prim::Primitives,operator::Function;
-  max_iter=100,paramtol=1e-8)
+  max_iter=100,paramtol=5e-3)
 
   ## Start in the good state and simulate sequence of T aggregate shocks
 
@@ -234,7 +234,8 @@ function k_s_compute(prim::Primitives,operator::Function;
     println("Iter Completed: ",j," paramdist: ", paramdist,
       " r2_g: ", r2_g, " r2_b: ", r2_b)
 
-    if paramdist < paramtol || r2_g >= 0.99 && r2_b >= 0.99
+    if paramdist < paramtol || r2_g >= 0.998 && r2_b >= 0.998
+      toc()
       break
     end
 
@@ -272,7 +273,7 @@ ylabel("Avg K")
 legend(loc="lower right")
 title("Average Capital")
 ax = PyPlot.gca()
-#savefig("C:/Users/j0el/Documents/Wisconsin/899/Problem Sets/PS4/Pictures/consequiv.pgf")
+savefig("C:/Users/j0el/Documents/Wisconsin/899/Problem Sets/PS8/Pictures/avg_K.pgf")
 
 # Sample agent asset holdings
 
@@ -282,13 +283,15 @@ sample_agent_holding = zeros(Float64,sample_size,prim.T-1000)
 for i in 1:sample_size
   agent_draw = rand(1:prim.N)
   sample_agent_holding[i,:] = k_holdings_vals_trim[agent_draw,:]
+  sampletitle = string("Capital Holdings - Agent ",agent_draw)
+  samplesave = string("samplek_",i)
 
-samplefig = figure()
-plot(linspace(1,prim.T-1000,prim.T-1000),sample_agent_holding[i,:],color="blue",linewidth=2.0)
-xlabel("t")
-ylabel("k holdings")
-legend(loc="lower right")
-title("Sample Capital Holdings")
-ax = PyPlot.gca()
-
+  samplefig = figure()
+  plot(linspace(1,prim.T-1000,prim.T-1000),sample_agent_holding[i,:],color="blue",linewidth=2.0)
+  xlabel("t")
+  ylabel("k holdings")
+  legend(loc="lower right")
+  title(sampletitle)
+  ax = PyPlot.gca()
+  savefig(string("C:/Users/j0el/Documents/Wisconsin/899/Problem Sets/PS8/Pictures/",samplesave,".pgf"))
 end
