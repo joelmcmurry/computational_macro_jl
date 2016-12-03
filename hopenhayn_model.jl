@@ -89,10 +89,10 @@ type Results
     end
 end
 
-## Solve Discrete Dynamic Program
+## Generate decision rules
 
 # Without initial value function (will be initialized at zeros)
-function SolveProgram(prim::Primitives;
+function DecisionRules(prim::Primitives;
   max_iter_vfi::Integer=500, epsilon_vfi::Real=1e-3)
     res = Results(prim)
     vfi!(prim, res, max_iter_vfi, epsilon_vfi)
@@ -100,7 +100,7 @@ function SolveProgram(prim::Primitives;
 end
 
 # With Initial value function
-function SolveProgram(prim::Primitives, W::Array{Float64};
+function DecisionRules(prim::Primitives, W::Array{Float64};
   max_iter_vfi::Integer=500, epsilon_vfi::Real=1e-3)
     res = Results(prim, W)
     vfi!(prim, res, max_iter_vfi, epsilon_vfi)
