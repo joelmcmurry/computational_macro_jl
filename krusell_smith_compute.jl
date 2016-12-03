@@ -10,7 +10,7 @@ include("krusell_smith_model.jl")
 
 # initialize model primitives
 
-const prim = Primitives(k_size=1800)
+const prim = Primitives(k_size=1000)
 
 function k_s_compute(prim::Primitives,operator::Function;
   max_iter=100,paramtol=1e-8)
@@ -255,3 +255,40 @@ end
 tic()
 prim, res, k_holdings_vals, k_holdings_index, k_avg, r2_g, r2_b = k_s_compute(prim,bellman_operator_grid!)
 toc()
+
+# trim simulated series
+
+k_avg_trim = k_avg[1001:prim.T]
+k_holdings_vals_trim = k_holdings_vals[:,1001:prim.T]
+
+## Plots
+
+# Average K
+
+Kfig = figure()
+plot(linspace(1,prim.T-1000,prim.T-1000),k_avg_trim,color="blue",linewidth=2.0,label="Avg K")
+xlabel("t")
+ylabel("Avg K")
+legend(loc="lower right")
+title("Average Capital")
+ax = PyPlot.gca()
+#savefig("C:/Users/j0el/Documents/Wisconsin/899/Problem Sets/PS4/Pictures/consequiv.pgf")
+
+# Sample agent asset holdings
+
+sample_size = 5
+sample_agent_holding = zeros(Float64,sample_size,prim.T-1000)
+
+for i in 1:sample_size
+  agent_draw = rand(1:prim.N)
+  sample_agent_holding[i,:] = k_holdings_vals_trim[agent_draw,:]
+
+samplefig = figure()
+plot(linspace(1,prim.T-1000,prim.T-1000),sample_agent_holding[i,:],color="blue",linewidth=2.0)
+xlabel("t")
+ylabel("k holdings")
+legend(loc="lower right")
+title("Sample Capital Holdings")
+ax = PyPlot.gca()
+
+end
