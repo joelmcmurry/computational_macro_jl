@@ -3,8 +3,6 @@ Program Name: hopenhayn_compute.jl
 Runs Hopenhayn model
 =#
 
-using PyPlot
-
 include("hopenhayn_model.jl")
 
 # initialize model primitives
