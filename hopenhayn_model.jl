@@ -30,7 +30,7 @@ names, and creates grid objects=#
 
 function Primitives(;beta::Float64=0.8,theta::Float64=0.64,A::Float64=(1/200),
     cf::Float64=10.0,ce::Float64=15.0,p::Float64=1.0,
-    n_min::Float64=1e-1,n_max::Float64=100.0,n_size::Int64=100)
+    n_min::Float64=0.0,n_max::Float64=100.0,n_size::Int64=100)
 
   # Calibrated arrays
 
@@ -65,16 +65,16 @@ type Results
     num_iter::Int ## VFI convergence iterations
     mu::Array{Float64} ## stationary distribution over firm size
     M::Float64 ## entrant mass
-    nd::Array{Int} ## labor demand incumbent
-    nde::Array{Int} ## labor demand entrant
+    nd::Array{Float64} ## labor demand incumbent
+    nde::Array{Float64} ## labor demand entrant
     x::Array{Int} ## exit choice incumbent
     xe::Array{Int} ## exit choice entrant
 
     function Results(prim::Primitives)
-        W = zeros(prim.s_size) # initialize value with zeroes
+        W = zeros(Float64,prim.s_size) # initialize value with zeroes
         mu = ones(prim.s_size)*(1/prim.s_size) # initialize stationary distribution with uniform
         res = new(W, similar(W), similar(W), 0, mu, 0.5,
-        similar(W,Int), similar(W,Int), similar(W,Int), similar(W,Int))
+        similar(W), similar(W), similar(W,Int), similar(W,Int))
 
         res
     end
@@ -83,7 +83,7 @@ type Results
     function Results(prim::Primitives,W::Array{Float64})
         mu = ones(prim.s_size)*(1/prim.s_size) # initialize stationary distribution with uniform
         res = new(W, similar(W), similar(W), 0, mu, 0.5,
-        similar(W,Int), similar(W,Int), similar(W,Int), similar(W,Int))
+        similar(W), similar(W), similar(W,Int), similar(W,Int))
 
         res
     end
@@ -116,7 +116,7 @@ end
 function bellman_operator_incumbent!(prim::Primitives, W::Array{Float64})
   # initialize
   TW = fill(-Inf,prim.s_size)
-  nd = zeros(Int64,prim.s_size)
+  nd = zeros(Float64,prim.s_size)
   x = zeros(Int64,prim.s_size)
 
   # find max value for each productivity level
@@ -137,13 +137,13 @@ function bellman_operator_incumbent!(prim::Primitives, W::Array{Float64})
       if value >= exit_value
         if value > max_value
           max_value = value
-          nd[s_index] = labor_choice
+          nd[s_index] = prim.n_vals[labor_choice]
           x[s_index] = 0
         end
       else
         if exit_value > max_value
           max_value = exit_value
-          nd[s_index] = labor_choice
+          nd[s_index] = prim.n_vals[labor_choice]
           x[s_index] = 1
         end
       end
@@ -158,7 +158,7 @@ end
 function bellman_operator_entrant!(prim::Primitives, W::Array{Float64})
   # initialize
   TWe = fill(-Inf,prim.s_size)
-  nde = zeros(Int64,prim.s_size)
+  nde = zeros(Float64,prim.s_size)
   xe = zeros(Int64,prim.s_size)
 
   # find max value for each productivity level
@@ -179,13 +179,13 @@ function bellman_operator_entrant!(prim::Primitives, W::Array{Float64})
       if value >= exit_value
         if value > max_value
           max_value = value
-          nde[s_index] = labor_choice
+          nde[s_index] = prim.n_vals[labor_choice]
           xe[s_index] = 0
         end
       else
         if exit_value > max_value
           max_value = exit_value
-          nde[s_index] = labor_choice
+          nde[s_index] = prim.n_vals[labor_choice]
           xe[s_index] = 1
         end
       end

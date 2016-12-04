@@ -9,11 +9,11 @@ include("hopenhayn_model.jl")
 
 # initialize model primitives
 
-const prim = Primitives(n_size=10000,n_max=1500.0)
+const prim = Primitives(n_size=10000,n_max=1000.0)
 
 function hopenhayn_compute(prim::Primitives;
     max_iter_ec=1000,ec_tol=1e-3,max_iter_dist=1000,dist_tol=1e-3,
-    max_iter_labor=50000,labor_tol=1e-2)
+    max_iter_labor=50000,labor_tol=1e-3)
 
   # initialize results objects
 
@@ -56,6 +56,8 @@ function hopenhayn_compute(prim::Primitives;
   # guess M = 1
 
   res.M = 1.0
+
+  # initialize labor supply and demand
 
   labor_d = 0.00
   labor_s = 0.00
@@ -102,7 +104,7 @@ function hopenhayn_compute(prim::Primitives;
     labor_d = 0.00
     for s_index in 1:prim.s_size
       labor_d += res.nd[s_index]*res.mu[s_index]
-      labor_d += res.M*res.nde[s_index]+prim.nu[s_index]
+      labor_d += res.M*res.nde[s_index]*prim.nu[s_index]
     end
 
     # labor supply
@@ -120,7 +122,7 @@ function hopenhayn_compute(prim::Primitives;
 
     # update M and stop when labor market clears
 
-    LMC = maxabs(labor_d - labor_s)
+    LMC = labor_d - labor_s
 
     println("Iter: ", j, " M: ", res.M, " LMC: ", LMC)
 
@@ -129,9 +131,9 @@ function hopenhayn_compute(prim::Primitives;
     end
 
     if LMC > 0
-      res.M = 0.9999*res.M + 0.0001*0.0 # lower M
+      res.M = 0.9999*res.M  # lower M
     else
-      res.M = 0.9999*res.M + 0.0001*1.00 # raise M
+      res.M = 1.0001*res.M # raise M
     end
 
   end
