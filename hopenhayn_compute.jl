@@ -9,7 +9,7 @@ include("hopenhayn_model.jl")
 
 # initialize model primitives
 
-const prim = Primitives(n_size=10000,n_max=1000.0)
+const prim = Primitives(n_size=10000,n_max=500.0)
 
 function hopenhayn_compute(prim::Primitives;
     max_iter_ec=1000,ec_tol=1e-3,max_iter_dist=1000,dist_tol=1e-3,
