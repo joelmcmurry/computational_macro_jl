@@ -97,10 +97,6 @@ function bootstrap(;T::Int=100,H::Int=10,R::Int=100)
   bhat2_vec = zeros(Float64,R,2)
 
   for i in 1:R
-    # draw true data
-    #true_data = generate_true(dgp,T=200)
-    # calculate data moments
-    #MT = data_moments(true_data)
     # draw simulated data
     sim_rv = generate_rv(T=200,H=10)
 
