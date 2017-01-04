@@ -24,7 +24,7 @@ end
 #= Outer Constructor for Primitives. Supplies default values, field
 names, and creates grid objects =#
 
-function Primitives(;beta::Float64=0.95, q::Float64=0.91, x::Float64=1.0,
+function Primitives(;beta::Float64=0.99, q::Float64=0.91, x::Float64=1.0,
   yH::Float64=1.6, yL::Float64=0.4, pi::Float64=0.5,
   ce::Float64=0.4713, w_size::Int64=100)
 

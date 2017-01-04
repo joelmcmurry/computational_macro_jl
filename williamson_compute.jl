@@ -130,3 +130,15 @@ ax = PyPlot.gca()
 ax[:set_xlim]((prim.w_min,prim.w_max))
 ax[:set_ylim]((0,3))
 #savefig("C:/Users/j0el/Documents/Wisconsin/899/Problem Sets/Final Project/Pictures/consumption.pgf")
+
+## Stationary Distribution
+
+distfig = figure()
+plot(prim.w_vals,res.statdist,color="blue",linewidth=1.0)
+xlabel("Agent Utility w")
+ylabel("Density")
+title("Stationary Distribution")
+ax = PyPlot.gca()
+ax[:set_xlim]((prim.w_min,prim.w_max))
+ax[:set_ylim]((0,0.75))
+#savefig("C:/Users/j0el/Documents/Wisconsin/899/Problem Sets/Final Project/Pictures/statdist.pgf")
