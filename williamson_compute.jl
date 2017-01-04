@@ -51,26 +51,14 @@ function williamson_compute(prim::Primitives;
       break
     end
 
-    # if EC > prim.ce
-    #   q_lower = prim.q # raise discount bond price
-    # else
-    #   q_upper = prim.q # lower discount bond price
-    # end
-    # q_new = (q_upper + q_lower)/2
-
     if EC > prim.ce
-      q_lower = prim.q
-      q_new = 0.9*prim.q + 0.1*q_upper # raise discount bond price
+      q_lower = prim.q # raise discount bond price
     else
-      q_upper = prim.q
-      q_new = 0.9*prim.q + 0.1*q_lower # lower discount bond price
+      q_upper = prim.q # lower discount bond price
     end
+    q_new = (q_upper + q_lower)/2
 
     prim.q = q_new
-
-    # update agent discount factor
-
-    #prim.beta = 2*0.9 - q_new
 
   end
 
@@ -97,7 +85,7 @@ title("Principal Value")
 ax = PyPlot.gca()
 ax[:set_xlim]((prim.w_min,prim.w_max))
 ax[:set_ylim]((-1,2))
-savefig("C:/Users/j0el/Documents/Wisconsin/899/Problem Sets/Final Project/Pictures/princ_value.pgf")
+#savefig("C:/Users/j0el/Documents/Wisconsin/899/Problem Sets/Final Project/Pictures/princ_value.pgf")
 
 ## Transfers
 
@@ -112,7 +100,7 @@ legend(loc="lower right")
 ax = PyPlot.gca()
 ax[:set_xlim]((prim.w_min,prim.w_max))
 ax[:set_ylim]((-3,1))
-savefig("C:/Users/j0el/Documents/Wisconsin/899/Problem Sets/Final Project/Pictures/transfers.pgf")
+#savefig("C:/Users/j0el/Documents/Wisconsin/899/Problem Sets/Final Project/Pictures/transfers.pgf")
 
 ## Utility Promises
 
@@ -127,7 +115,7 @@ legend(loc="lower right")
 ax = PyPlot.gca()
 ax[:set_xlim]((prim.w_min,prim.w_max))
 ax[:set_ylim]((prim.w_min,prim.w_max))
-savefig("C:/Users/j0el/Documents/Wisconsin/899/Problem Sets/Final Project/Pictures/utilities.pgf")
+#savefig("C:/Users/j0el/Documents/Wisconsin/899/Problem Sets/Final Project/Pictures/utilities.pgf")
 
 ## Consumption
 
@@ -141,4 +129,4 @@ legend(loc="lower right")
 ax = PyPlot.gca()
 ax[:set_xlim]((prim.w_min,prim.w_max))
 ax[:set_ylim]((0,3))
-savefig("C:/Users/j0el/Documents/Wisconsin/899/Problem Sets/Final Project/Pictures/consumption.pgf")
+#savefig("C:/Users/j0el/Documents/Wisconsin/899/Problem Sets/Final Project/Pictures/consumption.pgf")
