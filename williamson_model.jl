@@ -1,6 +1,6 @@
 #=
 Program Name: williamson_model.jl
-Creates Williamson (1998) Model and Utilities
+Creates Williamson (1998) model and utilities
 =#
 
 using QuantEcon: gridmake
@@ -19,38 +19,26 @@ type Primitives
   w_max :: Float64 ## maximum feasible expected utility
   w_size :: Int64 ## size of expected utility grid
   w_vals :: Vector{Float64} ## expected utility grid
-  #w_indices :: Array{Int64} ## indices of expected utility grid
-  #tau_min :: Float64 ## minimum transfer value
-  #tau_max :: Float64 ## maximum transfer value
-  #tau_size :: Int64 ## size of transfer value grid
-  #tau_vals :: Vector{Float64} ## transfer value grid
-  #tau_indices :: Array{Int64} ## indices of transfer value grid
 end
 
 #= Outer Constructor for Primitives. Supplies default values, field
 names, and creates grid objects =#
 
-function Primitives(;beta::Float64=0.9, q::Float64=0.91, x::Float64=1.0,
+function Primitives(;beta::Float64=0.99, q::Float64=0.91, x::Float64=1.0,
   yH::Float64=1.6, yL::Float64=0.4, pi::Float64=0.5,
-  ce::Float64=0.4713, w_size::Int64=100, tau_min::Float64=-2.0,
-  tau_max::Float64=1.0, tau_size::Int64=100)
+  ce::Float64=0.4713, w_size::Int64=100)
 
   # Calculate w_min and w_max
 
   w_min = pi*(1-exp(-(yH - yL)))
   w_max = pi*(1-exp(-(yH + x))) + (1-pi)*(1-exp(-(yL + x)))
 
-  # Grids
+  # Utility grid
 
   w_vals = linspace(w_min, w_max, w_size)
-  w_indices = gridmake(1:w_size)
-
-  tau_vals = linspace(tau_min, tau_max, tau_size)
-  tau_indices = gridmake(1:tau_size)
 
   primitives = Primitives(beta, q, x, yH, yL, pi, ce,
-    w_min, w_max, w_size, w_vals, w_indices,
-    tau_min, tau_max, tau_size, tau_vals, tau_indices)
+    w_min, w_max, w_size, w_vals)
 
   return primitives
 
@@ -67,14 +55,16 @@ type Results
     tau::Array{Float64,2}
     statdist::Array{Float64}
     num_dist::Int
+    principal_value::Array{Float64}
+    consumption::Array{Float64,2}
 
     function Results(prim::Primitives)
         v = zeros(prim.w_size) # initialize cost with zeros
         wprime_indices = zeros(Int,(prim.w_size,2)) # initialize wprime choice index with zeros
         wprime = zeros(prim.w_size,2) # initialize wprime choice with zeros
-        statdist = ones(prim.w_size)*(1/prim.w_size)# initialize stationary distribution with uniform
+        statdist = ones(prim.w_size)*(1/(prim.w_size))# initialize stationary distribution with uniform
         res = new(v, similar(v), 0, wprime_indices, wprime,
-          similar(wprime), statdist, 0)
+          similar(wprime), statdist, 0, similar(v), similar(wprime))
 
         res
     end
@@ -83,35 +73,35 @@ type Results
     function Results(prim::Primitives,v::Array{Float64})
         wprime_indices = zeros(Int,(prim.w_size,2))
         wprime = zeros(prim.w_size,2)
-        statdist = ones(prim.w_size)*(1/prim.w_size)
+        statdist = ones(prim.w_size)*(1/(prim.w_size))
         res = new(v, similar(v), 0, wprime_indices, wprime,
-          similar(wprime), statdist, 0)
+          similar(wprime), statdist, 0, similar(v), similar(wprime))
 
         res
     end
 end
 
-# ## Solve Discrete Dynamic Program
-#
-# # Without initial value function (will be initialized at zeros)
-# function SolveProgram(prim::Primitives;
-#   max_iter_vfi::Integer=500, epsilon_vfi::Real=1e-3,
-#   max_iter_statdist::Integer=500, epsilon_statdist::Real=1e-3)
-#     res = Results(prim)
-#     vfi!(prim, res, max_iter_vfi, epsilon_vfi)
-#     create_statdist!(prim, res, max_iter_statdist, epsilon_statdist)
-#     res
-# end
-#
-# # With Initial value function
-# function SolveProgram(prim::Primitives, v::Array{Float64,2};
-#   max_iter_vfi::Integer=500, epsilon_vfi::Real=1e-3,
-#   max_iter_statdist::Integer=500, epsilon_statdist::Real=1e-3)
-#     res = Results(prim, v)
-#     vfi!(prim, res, max_iter_vfi, epsilon_vfi)
-#     create_statdist!(prim, res, max_iter_statdist, epsilon_statdist)
-#     res
-# end
+## Solve Program
+
+# Without initial value function (will be initialized at zeros)
+function SolveProgram(prim::Primitives;
+  max_iter_vfi::Integer=500, epsilon_vfi::Real=1e-3,
+  max_iter_statdist::Integer=500, epsilon_statdist::Real=1e-3)
+    res = Results(prim)
+    vfi!(prim, res, max_iter_vfi, epsilon_vfi)
+    create_statdist!(prim, res, max_iter_statdist, epsilon_statdist)
+    res
+end
+
+# With Initial value function
+function SolveProgram(prim::Primitives, v::Array{Float64};
+  max_iter_vfi::Integer=500, epsilon_vfi::Real=1e-3,
+  max_iter_statdist::Integer=500, epsilon_statdist::Real=1e-3)
+    res = Results(prim, v)
+    vfi!(prim, res, max_iter_vfi, epsilon_vfi)
+    create_statdist!(prim, res, max_iter_statdist, epsilon_statdist)
+    res
+end
 
 #= Internal Utilities =#
 
@@ -120,7 +110,6 @@ end
 function bellman_operator!(prim::Primitives, v::Array{Float64})
   # initialize
   Tv = fill(Inf,prim.w_size)
-  #Tv = fill(1000.0,prim.w_size)
   wprime_indices = zeros(Int,(prim.w_size,2))
   wprime = zeros(prim.w_size,2)
   tau = zeros(prim.w_size,2)
@@ -131,7 +120,6 @@ function bellman_operator!(prim::Primitives, v::Array{Float64})
 
     # initialize cost for (wprimeH,wprimeL) combinations
     min_cost = Inf
-    #min_cost = 1000.0
 
     # find min cost for each (wprimeH,wprimeL) combination
     for wprimeH_index in 1:prim.w_size
@@ -173,12 +161,12 @@ function bellman_operator!(prim::Primitives, v::Array{Float64})
             tau[w_index,2] = tauL
           end
 
-        end #taucheck
+        end
 
-      end #wprimeL
-    end #wprimeH
+      end
+    end
     Tv[w_index] = min_cost
-  end #w
+  end
   Tv, wprime_indices, wprime, tau
 end
 
@@ -196,16 +184,16 @@ function vfi!(prim::Primitives, res::Results,
 
     for i in 1:max_iter
         # updates Tv and choice arrays in place
-        res.Tv, res.wprime, res.tau = bellman_operator!(prim,res.v)
+        res.Tv, res.wprime_indices, res.wprime, res.tau = bellman_operator!(prim,res.v)
 
         # compute error and update the value with Tv inside results
         err = maxabs(res.Tv .- res.v)
         copy!(res.v, res.Tv)
         res.num_iter += 1
-        println("Iter: ", i, " Error: ", err)
+        #println("Iter: ", i, " Error: ", err)
 
         if err < tol
-            break
+          break
         end
     end
 
@@ -217,50 +205,83 @@ end
 function create_statdist!(prim::Primitives, res::Results,
   max_iter::Integer, epsilon::Real)
 
+# number of states (w,y) is 2 times w grid size
 N = 2*prim.w_size
 
 #= Create transition matrix Tstar that is N x N, where N is the number
-of promised utility/endowment combinations. Each row of Tstar is a conditional
-distribution over w' conditional on (w,y) today defined by row index =#
+of (promised utility,endowment) combinations. Each row of Tstar is a
+distribution over (w',y') conditional on (w,y) today defined by row index =#
 
 Tstar = spzeros(N,N)
 
-for w_index in 1:N
-  choice_index = res.sigma[prim.a_s_indices[state_today,1],
-  prim.a_s_indices[state_today,2]] #a' given (a,s)
-  for state_tomorrow in 1:N
-    if prim.a_s_indices[state_tomorrow,1] == choice_index
-      Tstar[state_today,state_tomorrow] =
-        prim.markov[prim.a_s_indices[state_today,2]
-        ,prim.a_s_indices[state_tomorrow,2]]
-    end
+for state_today in 1:N
+
+  # indentify utility and endowment indices from state index
+  if state_today <= prim.w_size # endowed with yH
+    w_index = state_today # w index
+    endow_index = 1 # yH index
+  else # endowed with yL
+    w_index = state_today - prim.w_size # w index
+    endow_index = 2 # yL index
   end
+
+  # use decision rule to determine w' given (w,y)
+  wprime_index = res.wprime_indices[w_index,endow_index]
+
+  # fill in transition matrix using endowment process (iid in this case)
+  for state_tomorrow in 1:N
+
+    if state_tomorrow <= prim.w_size # endowment tomorrow is yH
+      if state_tomorrow == wprime_index
+        Tstar[state_today,state_tomorrow] = prim.pi
+      end
+    else # endowment tomorrow is yL
+      if state_tomorrow - prim.w_size == wprime_index
+        Tstar[state_today,state_tomorrow] = (1-prim.pi)
+      end
+    end
+
+  end
+
 end
 
-#= Find stationary distribution. Start with any distribution over
+#= Find stationary distribution. Start with uniform distribution over
 states and feed through Tstar matrix until convergence=#
 
-statdist = res.statdist
+tempdist = ones(N)*(1/N)
 
-num_iter = 0
+res.num_dist = 0
 
   for i in 1:max_iter
 
-      statdistprime = Tstar'*statdist
+      tempdistprime = Tstar'*tempdist
 
       # compute error and update stationary distribution
-      err = maxabs(statdistprime .- statdist)
-      copy!(statdist, statdistprime)
-      num_iter += 1
+      err = maxabs(tempdistprime .- tempdist)
+      copy!(tempdist, tempdistprime)
+      res.num_dist += 1
 
       if err < epsilon
-          break
+        break
       end
   end
 
-  res.statdist = statdist
-  res.num_dist = num_iter
+  # collapse distribution over (w,y) into distribution over w only
+
+  for w_index in 1:prim.w_size
+    res.statdist[w_index] = tempdist[w_index] + tempdist[w_index + prim.w_size]
+  end
 
   res
 
+end
+
+## Calculate Principal Value and Agent Consumption
+
+function value_consumption!(prim::Primitives,res::Results)
+
+  res.principal_value = -res.v - (1/prim.q)*(1-prim.q)*prim.x
+  res.consumption = res.tau + [prim.yH prim.yL].*ones(res.tau)
+
+  res
 end
