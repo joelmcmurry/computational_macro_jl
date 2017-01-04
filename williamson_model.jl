@@ -4,6 +4,7 @@ Creates Williamson (1998) model and utilities
 =#
 
 using QuantEcon: gridmake
+using ChebyshevApprox
 
 ## Create composite type to hold model primitives
 
@@ -109,7 +110,7 @@ end
 
 # Grid Search
 
-function bellman_operator!(prim::Primitives, v::Array{Float64})
+function bellman_gridsearch!(prim::Primitives, v::Array{Float64})
   # initialize
   Tv = fill(Inf,prim.w_size)
   wprime_indices = zeros(Int,(prim.w_size,2))
@@ -174,12 +175,15 @@ end
 
 # Interpolation with Chebyshev Polynomials
 
-function bellman_operator!(prim::Primitives, v::Array{Float64})
+function bellman_chebyshev!(prim::Primitives, v::Array{Float64})
   # initialize
   Tv = fill(Inf,prim.w_size)
   wprime_indices = zeros(Int,(prim.w_size,2))
   wprime = zeros(prim.w_size,2)
   tau = zeros(prim.w_size,2)
+
+  # fit third-order Chebyshev polynomial to value function (plus 1/(1-w) as in Williamson 1998)
+  weights = chebyshev_weights(v,prim.w_vals,3,[prim.w_min, prim.w_max])
 
   # loop over promised utility values
   for w_index in 1:prim.w_size
