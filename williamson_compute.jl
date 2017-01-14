@@ -10,7 +10,7 @@ include("williamson_model.jl")
 # initialize model primitives
 
 #const prim = Primitives(w_size=100)
-prim = Primitives(w_size=100)
+prim = Primitives(w_size=150,chebyshev_flag=0)
 
 function williamson_compute(prim::Primitives;
     max_iter_ec=100,ec_tol=1e-2)
@@ -32,14 +32,14 @@ function williamson_compute(prim::Primitives;
     v = res.v
 
     #res = SolveProgram(prim)
-    res = SolveProgram(prim,v)
+    res = SolveProgram(bellman_gridsearch!,prim,v)
 
     # calculate entry condition EC(q)
 
     EC = 0.0
 
     for w_index in 1:prim.w_size
-      transfers = prim.pi*res.tau[w_index,1] + (1-prim.pi)*res.tau[w_index,2]
+      transfers = prim.pi*res.tau_vals[w_index,1] + (1-prim.pi)*res.tau_vals[w_index,2]
       EC += transfers*res.statdist[w_index]
     end
 
@@ -80,7 +80,7 @@ toc()
 valfig = figure()
 plot(prim.w_vals,res.principal_value,color="blue",linewidth=2.0)
 xlabel("Agent Utility w")
-ylabel("Principal Value v")
+ylabel("Principal Value z")
 title("Principal Value")
 ax = PyPlot.gca()
 ax[:set_xlim]((prim.w_min,prim.w_max))
@@ -90,8 +90,8 @@ ax[:set_ylim]((-1,2))
 ## Transfers
 
 transferfig = figure()
-plot(prim.w_vals,res.tau[:,1],color="blue",linewidth=1.0,label="t_H")
-plot(prim.w_vals,res.tau[:,2],color="red",linewidth=1.0,label="t_L")
+plot(prim.w_vals,res.tau_vals[:,1],color="blue",linewidth=1.0,label="t_H")
+plot(prim.w_vals,res.tau_vals[:,2],color="red",linewidth=1.0,label="t_L")
 plot(prim.w_vals,zeros(prim.w_vals),color="green",linewidth=0.5,label="zero")
 xlabel("Agent Utility w")
 ylabel("Transfer")
@@ -105,8 +105,8 @@ ax[:set_ylim]((-3,1))
 ## Utility Promises
 
 utilityfig = figure()
-plot(prim.w_vals,res.wprime[:,1],color="blue",linewidth=1.0,label="w'_H")
-plot(prim.w_vals,res.wprime[:,2],color="red",linewidth=1.0,label="w'_L")
+plot(prim.w_vals,res.wprime_vals[:,1],color="blue",linewidth=1.0,label="w'_H")
+plot(prim.w_vals,res.wprime_vals[:,2],color="red",linewidth=1.0,label="w'_L")
 plot(prim.w_vals,prim.w_vals,color="green",linewidth=0.5,label="w=w'")
 xlabel("Agent Utility w")
 ylabel("Agent Future Utility w'")
@@ -120,8 +120,8 @@ ax[:set_ylim]((prim.w_min,prim.w_max))
 ## Consumption
 
 consfig = figure()
-plot(prim.w_vals,res.wprime[:,1],color="blue",linewidth=1.0,label="c_H=y_H+t_H")
-plot(prim.w_vals,res.wprime[:,2],color="red",linewidth=1.0,label="c_L=y_L+t_L")
+plot(prim.w_vals,res.wprime_vals[:,1],color="blue",linewidth=1.0,label="c_H=y_H+t_H")
+plot(prim.w_vals,res.wprime_vals[:,2],color="red",linewidth=1.0,label="c_L=y_L+t_L")
 xlabel("Agent Utility w")
 ylabel("Agent Consumption")
 title("Agent Consumption")
