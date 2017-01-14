@@ -4,13 +4,8 @@ Creates Williamson (1998) model and utilities
 =#
 
 using QuantEcon: gridmake
-#using ChebyshevApprox
-#using Optim
 using JuMP
 using NLopt
-#using Ipopt
-#using Mosek
-#using BlackBoxOptim
 
 ## Create composite type to hold model primitives
 
@@ -209,33 +204,54 @@ function bellman_gridsearch!(prim::Primitives, v::Array{Float64})
 
         # find transfer schedule determined by promise constraint and binding IC
         # check that (tauH,tauL) is defined and within constraints
-        if ((wprimeL-1)*prim.beta - w + 1)/
-        (((prim.pi-1)*exp(prim.yH-prim.yL)-prim.pi)*(prim.beta-1)) > 0 &&
-        ((1-prim.pi)*prim.beta*(wprimeH-wprimeL)*exp(prim.yH-prim.yL) +
-          prim.beta*(prim.pi*wprimeH + (1-prim.pi)*wprimeL) - w + 1 - prim.beta)/
-        (((prim.pi-1)*exp(prim.yH-prim.yL)-prim.pi)*(prim.beta-1)) > 0 &&
+        if (((wprimeL-1)*prim.beta - w + 1)/
+        (prim.beta*prim.pi*exp(prim.yH-prim.yL)-prim.pi*prim.beta -
+          prim.beta*exp(prim.yH-prim.yL)-prim.pi*exp(prim.yH-prim.yL) +
+          prim.pi + exp(prim.yH-prim.yL))) > 0 &&
+          (-(prim.beta*prim.pi*wprimeH*exp(prim.yH-prim.yL) -
+            prim.beta*prim.pi*wprimeL*exp(prim.yH-prim.yL) -
+            prim.pi*prim.beta*wprimeH + prim.pi*prim.beta*wprimeL -
+            prim.beta*wprimeH*exp(prim.yH-prim.yL) +
+            prim.beta*wprimeL*exp(prim.yH-prim.yL) -
+            prim.beta*wprimeL + prim.beta + w - 1)
+            /
+          ((prim.beta-1)*(prim.pi*exp(prim.yH-prim.yL)-prim.pi-exp(prim.yH-prim.yL)))) > 0 &&
         -prim.yH <= -prim.yH -
           log(
-            ((wprimeL-1)*prim.beta - w + 1)/
-            (((prim.pi-1)*exp(prim.yH-prim.yL)-prim.pi)*(prim.beta-1))
+            -(prim.beta*prim.pi*wprimeH*exp(prim.yH-prim.yL) -
+              prim.beta*prim.pi*wprimeL*exp(prim.yH-prim.yL) -
+              prim.pi*prim.beta*wprimeH + prim.pi*prim.beta*wprimeL -
+              prim.beta*wprimeH*exp(prim.yH-prim.yL) +
+              prim.beta*wprimeL*exp(prim.yH-prim.yL) -
+              prim.beta*wprimeL + prim.beta + w - 1)
+              /
+            ((prim.beta-1)*(prim.pi*exp(prim.yH-prim.yL)-prim.pi-exp(prim.yH-prim.yL)))
             ) <= prim.x &&
         -prim.yL <= -prim.yH -
           log(
-            ((1-prim.pi)*prim.beta*(wprimeH-wprimeL)*exp(prim.yH-prim.yL) +
-              prim.beta*(prim.pi*wprimeH + (1-prim.pi)*wprimeL) - w + 1 - prim.beta)/
-            (((prim.pi-1)*exp(prim.yH-prim.yL)-prim.pi)*(prim.beta-1))
+            ((wprimeL-1)*prim.beta - w + 1)/
+            (prim.beta*prim.pi*exp(prim.yH-prim.yL)-prim.pi*prim.beta -
+              prim.beta*exp(prim.yH-prim.yL)-prim.pi*exp(prim.yH-prim.yL) +
+              prim.pi + exp(prim.yH-prim.yL))
             ) <= prim.x
 
           tauL = -prim.yH -
             log(
               ((wprimeL-1)*prim.beta - w + 1)/
-              (((prim.pi-1)*exp(prim.yH-prim.yL)-prim.pi)*(prim.beta-1))
+              (prim.beta*prim.pi*exp(prim.yH-prim.yL)-prim.pi*prim.beta -
+                prim.beta*exp(prim.yH-prim.yL)-prim.pi*exp(prim.yH-prim.yL) +
+                prim.pi + exp(prim.yH-prim.yL))
               )
           tauH = -prim.yH -
             log(
-              ((1-prim.pi)*prim.beta*(wprimeH-wprimeL)*exp(prim.yH-prim.yL) +
-                prim.beta*(prim.pi*wprimeH + (1-prim.pi)*wprimeL) - w + 1 - prim.beta)/
-              (((prim.pi-1)*exp(prim.yH-prim.yL)-prim.pi)*(prim.beta-1))
+              -(prim.beta*prim.pi*wprimeH*exp(prim.yH-prim.yL) -
+                prim.beta*prim.pi*wprimeL*exp(prim.yH-prim.yL) -
+                prim.pi*prim.beta*wprimeH + prim.pi*prim.beta*wprimeL -
+                prim.beta*wprimeH*exp(prim.yH-prim.yL) +
+                prim.beta*wprimeL*exp(prim.yH-prim.yL) -
+                prim.beta*wprimeL + prim.beta + w - 1)
+                /
+              ((prim.beta-1)*(prim.pi*exp(prim.yH-prim.yL)-prim.pi-exp(prim.yH-prim.yL)))
               )
 
           # calculate cost given wprimeH, wprimeL, tauH, tauL
@@ -261,27 +277,75 @@ function bellman_gridsearch!(prim::Primitives, v::Array{Float64})
   Tv, wprime_indices, wprime_vals, tau_vals
 end
 
+testgrid = bellman_gridsearch!(prim,v)
+
+# Alternate grid search: look over transfers
+
+function bellman_gridsearch_alt!(prim::Primitives, v::Array{Float64})
+  # initialize
+  Tv = fill(Inf,prim.w_size)
+  wprime_vals = zeros(prim.w_size,2)
+  tau_vals = zeros(prim.w_size,2)
+
+  tausize = 100
+
+  tauL_vals = linspace(-prim.yL,prim.x,tausize)
+  tauH_vals = linspace(-prim.yH,prim.x,tausize)
+
+  # loop over promised utility values
+  for w_index in 1:prim.w_size
+    w = prim.w_vals[w_index]
+
+    # initialize cost for (wprimeH,wprimeL) combinations
+    min_cost = Inf
+
+    # find min cost for each (wprimeH,wprimeL) combination
+    for tauH_index in 1:tausize
+      tauH = tauH_vals[tauH_index]
+      for tauL_index in 1:tausize
+        tauL = tauL_vals[tauL_index]
+
+        # find transfer schedule determined by promise constraint and binding IC
+        # check that (tauH,tauL) is defined and within constraints
+        wprimeH = (1/prim.beta)*(prim.pi*exp(-prim.yL-tauL)*prim.beta -
+          prim.pi*exp(-prim.yH-tauL)*prim.beta - prim.pi*exp(-prim.yL-tauL) +
+          prim.pi*exp(-prim.yH-tauL) - prim.beta*exp(-prim.yH-tauH) -
+          exp(-prim.yL-tauL)*prim.beta + prim.beta*exp(-prim.yH-tauL) +
+          exp(-prim.yH-tauH) + exp(-prim.yL-tauL) - exp(-prim.yH-tauL) +
+          prim.beta + w - 1)
+        wprimeL = (1/prim.beta)*(prim.pi*exp(-prim.yL-tauL)*prim.beta -
+          prim.pi*exp(-prim.yH-tauL)*prim.beta - prim.pi*exp(-prim.yL-tauL) +
+          prim.pi*exp(-prim.yH-tauL) - exp(-prim.yL-tauL)*prim.beta +
+          exp(-prim.yL-tauL) + prim.beta + w - 1)
+
+        if prim.w_min <= wprimeH <= prim.w_max && prim.w_min <= wprimeL <= prim.w_max
+
+          # calculate cost given wprimeH, wprimeL, tauH, tauL
+          cost = (1-prim.q)*(prim.pi*tauH + (1-prim.pi)*tauL) +
+            prim.q*(prim.pi*v[wprimeH_index] + (1-prim.pi)*v[wprimeL_index])
+
+          if cost < min_cost
+            min_cost = cost
+            wprime_vals[w_index,1] = wprimeH
+            wprime_vals[w_index,2] = wprimeL
+            tau_vals[w_index,1] = tauH
+            tau_vals[w_index,2] = tauL
+          end
+
+        end
+
+      end
+    end
+    Tv[w_index] = min_cost
+  end
+  Tv, wprime_vals, tau_vals
+end
+
+testgrid_alt = bellman_gridsearch_alt!(prim,v)
+
 # Interpolation with Chebyshev Polynomials
 
 # JuMP
-
-# define cost function with Chebyshev approximation and 1/1-w term to improve fit
-
-# cost(wprimeH,wprimeL,tauH,tauL,w,q,pi,w_min,w_max,cheby_coeff1,cheby_coeff2,cheby_coeff3,cheby_coeff4) =
-#   (1-q)*(pi*tauH + (1-pi)*tauL) +
-#   q*(pi*
-#     (cheby_coeff1 + cheby_coeff2*(2*(wprimeH-w_min)/(w_max-w_min) - 1) +
-#     cheby_coeff3*(2*(2*(wprimeH-w_min)/(w_max-w_min) - 1)^2 - 1) +
-#     cheby_coeff4*(4*(2*(wprimeH-w_min)/(w_max-w_min) - 1)^3 -
-#       3*(2*(wprimeH-w_min)/(w_max-w_min) - 1))) +
-#   (1-pi)*
-#   (cheby_coeff1 + cheby_coeff2*(2*(wprimeL-w_min)/(w_max-w_min) - 1) +
-#   cheby_coeff3*(2*(2*(wprimeL-w_min)/(w_max-w_min) - 1)^2 - 1) +
-#   cheby_coeff4*(4*(2*(wprimeL-w_min)/(w_max-w_min) - 1)^3 -
-#     3*(2*(wprimeL-w_min)/(w_max-w_min) - 1)))
-#   ) - 1/(1-w)
-#
-# JuMP.register(:cost,13,cost,autodiff=true)
 
 function bellman_chebyshev_jump!(prim::Primitives, v::Array{Float64})
   # initialize
@@ -304,22 +368,26 @@ function bellman_chebyshev_jump!(prim::Primitives, v::Array{Float64})
 
   # set promised utility parameter to first value
   @NLparameter(m, w == prim.w_vals[1])
-  #@NLparameter(m, q == prim.q)
-  #@NLparameter(m, pi == prim.pi)
-  #@NLparameter(m, w_min == prim.w_min)
-  #@NLparameter(m, w_max == prim.w_max)
-  #@NLparameter(m, cheby_coeff1 == cheby_coeff[1])
-  #@NLparameter(m, cheby_coeff2 == cheby_coeff[2])
-  #@NLparameter(m, cheby_coeff3 == cheby_coeff[3])
-  #@NLparameter(m, cheby_coeff4 == cheby_coeff[4])
-
-  # # objective function
-  # @NLobjective(m, Min, cost(wprimeH,wprimeL,tauH,tauL,w,
-  #   q,pi,w_min,w_max,cheby_coeff1,cheby_coeff2,cheby_coeff3,cheby_coeff4))
 
   # objective function
-  @NLobjective(m, Min,
-  (1-prim.q)*(prim.pi*tauH + (1-prim.pi)*tauL) +
+  # @NLobjective(m, Min,
+  # (1-prim.q)*(prim.pi*tauH + (1-prim.pi)*tauL) +
+  # prim.q*(prim.pi*
+  #   (cheby_coeff[1] + cheby_coeff[2]*(2*(wprimeH-prim.w_min)/(prim.w_max-prim.w_min) - 1) +
+  #   cheby_coeff[3]*(2*(2*(wprimeH-prim.w_min)/(prim.w_max-prim.w_min) - 1)^2 - 1) +
+  #   cheby_coeff[4]*(4*(2*(wprimeH-prim.w_min)/(prim.w_max-prim.w_min) - 1)^3 -
+  #     3*(2*(wprimeH-prim.w_min)/(prim.w_max-prim.w_min) - 1))) +
+  # (1-prim.pi)*
+  # (cheby_coeff[1] + cheby_coeff[2]*(2*(wprimeL-prim.w_min)/(prim.w_max-prim.w_min) - 1) +
+  # cheby_coeff[3]*(2*(2*(wprimeL-prim.w_min)/(prim.w_max-prim.w_min) - 1)^2 - 1) +
+  # cheby_coeff[4]*(4*(2*(wprimeL-prim.w_min)/(prim.w_max-prim.w_min) - 1)^3 -
+  #   3*(2*(wprimeL-prim.w_min)/(prim.w_max-prim.w_min) - 1)))
+  # )
+  # )
+
+  # objective function
+  @NLobjective(m, Max,
+  (1-prim.q)*(prim.pi*(prim.x-tauH) + (1-prim.pi)*(prim.x-tauL)) +
   prim.q*(prim.pi*
     (cheby_coeff[1] + cheby_coeff[2]*(2*(wprimeH-prim.w_min)/(prim.w_max-prim.w_min) - 1) +
     cheby_coeff[3]*(2*(2*(wprimeH-prim.w_min)/(prim.w_max-prim.w_min) - 1)^2 - 1) +
@@ -333,21 +401,6 @@ function bellman_chebyshev_jump!(prim::Primitives, v::Array{Float64})
   ) - prim.q/(1-w)
   )
 
-  # @NLobjective(m, Max,
-  # -(1-prim.q)*(prim.pi*tauH + (1-prim.pi)*tauL) +
-  # prim.q*(prim.pi*
-  #   (cheby_coeff[1] + cheby_coeff[2]*(2*(wprimeH-prim.w_min)/(prim.w_max-prim.w_min) - 1) +
-  #   cheby_coeff[3]*(2*(2*(wprimeH-prim.w_min)/(prim.w_max-prim.w_min) - 1)^2 - 1) +
-  #   cheby_coeff[4]*(4*(2*(wprimeH-prim.w_min)/(prim.w_max-prim.w_min) - 1)^3 -
-  #     3*(2*(wprimeH-prim.w_min)/(prim.w_max-prim.w_min) - 1))) +
-  # (1-prim.pi)*
-  # (cheby_coeff[1] + cheby_coeff[2]*(2*(wprimeL-prim.w_min)/(prim.w_max-prim.w_min) - 1) +
-  # cheby_coeff[3]*(2*(2*(wprimeL-prim.w_min)/(prim.w_max-prim.w_min) - 1)^2 - 1) +
-  # cheby_coeff[4]*(4*(2*(wprimeL-prim.w_min)/(prim.w_max-prim.w_min) - 1)^3 -
-  #   3*(2*(wprimeL-prim.w_min)/(prim.w_max-prim.w_min) - 1)))
-  # ) + (1-prim.q)*prim.x + prim.q/(1-w)
-  # )
-
   # constraints
 
   # full constraints
@@ -358,13 +411,6 @@ function bellman_chebyshev_jump!(prim::Primitives, v::Array{Float64})
     (1-prim.beta)*(1-exp(-prim.yH - tauH)) + prim.beta*wprimeH)
   @NLconstraint(m, (1-prim.beta)*(1-exp(-prim.yL - tauH)) + prim.beta*wprimeH <=
     (1-prim.beta)*(1-exp(-prim.yL - tauL)) + prim.beta*wprimeL)
-
-  # impose binding IC and ignore slack IC
-  # @NLconstraint(m, w == (1-prim.beta)*(prim.pi*(1-exp(-prim.yH - tauH)) +
-  #   (1-prim.pi)*(1-exp(-prim.yL - tauL))) +
-  #   prim.beta*(prim.pi*wprimeH + (1-prim.pi)*wprimeL))
-  # @NLconstraint(m, (1-prim.beta)*(1-exp(-prim.yH - tauL)) + prim.beta*wprimeL ==
-  #   (1-prim.beta)*(1-exp(-prim.yH - tauH)) + prim.beta*wprimeH)
 
   # loop over promised utility values
   for w_index in 1:prim.w_size
@@ -389,63 +435,8 @@ function bellman_chebyshev_jump!(prim::Primitives, v::Array{Float64})
 end
 
 tic()
-testcheb = bellman_chebyshev_jump!(prim,v)
+testcheb1 = bellman_chebyshev_jump!(prim,v)
 toc()
-
-# Optim, runs into trouble with log domain error
-
-# function bellman_chebyshev_optim!(prim::Primitives, v::Array{Float64})
-#   # initialize
-#   Tv = fill(Inf,prim.w_size)
-#   #wprime_indices = zeros(Int,(prim.w_size,2))
-#   wprime_vals = zeros(prim.w_size,2)
-#   tau_vals = zeros(prim.w_size,2)
-#
-#   # find Chebyshev coefficients
-#   cheby_coeff = cheby_coeff_three!(v,prim.cheby_unit_nodes)
-#
-#   # loop over promised utility values
-#   for w_index in 1:prim.w_size
-#     w = prim.w_vals[w_index]
-#
-#     #= find min cost given promised utility w combination and
-#     binding IC constraint =#
-#
-#     tauL(wprime) = -prim.yH -
-#       log(
-#         ((wprime[2]-1)*prim.beta - w + 1)/
-#         (((prim.pi-1)*exp(prim.yH-prim.yL)-prim.pi)*(prim.beta-1))
-#         )
-#     tauH(wprime) = -prim.yH -
-#       log(
-#         ((1-prim.pi)*prim.beta*(wprime[1]-wprime[2])*exp(prim.yH-prim.yL) +
-#           prim.beta*(prim.pi*wprime[1] + (1-prim.pi)*wprime[2]) - w + 1 - prim.beta)/
-#         (((prim.pi-1)*exp(prim.yH-prim.yL)-prim.pi)*(prim.beta-1))
-#         )
-#
-#       # define cost function with Chebyshev approximation
-#       cost(wprime) = (1-prim.q)*(prim.pi*tauH(wprime) + (1-prim.pi)*tauL(wprime)) +
-#         prim.q*(prim.pi*cheby_approx!(wprime[1],cheby_coeff,prim.w_min,prim.w_max) +
-#         (1-prim.pi)*cheby_approx!(wprime[2],cheby_coeff,prim.w_min,prim.w_max)) -
-#         1/(1-w)
-#
-#     lower = [prim.w_min, prim.w_min]
-#     upper = [prim.w_max, prim.w_max]
-#     initial = upper - [1e-6, 1e-6]
-#     opt_results = optimize(DifferentiableFunction(cost),initial,lower,upper,Fminbox(),optimizer=GradientDescent)
-#
-#     wprime_vals[w_index,1] = opt_results.minimizer[1]
-#     wprime_vals[w_index,2] = opt_results.minimizer[2]
-#     tau_vals[w_index,1] = tauH(opt_results.minimizer)
-#     tau_vals[w_index,2] = tauL(opt_results.minimizer)
-#
-#     # Find inidices?????
-#
-#   end
-#   #Tv, wprime_indices, wprime_vals, tau_vals
-#   Tv, wprime_vals, tau_vals
-# end
-#
 
 ## Value Function Iteration
 
