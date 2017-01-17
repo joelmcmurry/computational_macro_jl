@@ -4,13 +4,9 @@ Creates Williamson (1998) model and utilities
 =#
 
 using QuantEcon: gridmake
-<<<<<<< HEAD
-using ChebyshevApprox
-=======
 using JuMP
 using NLopt
 using Interpolations
->>>>>>> chebyshev
 
 ## Create composite type to hold model primitives
 
@@ -168,73 +164,6 @@ function cheby_coeff_three!(func_image::Array,nodes_unit::Array)
 
   return cheby_coeff
 end
-<<<<<<< HEAD
-#
-# # Interpolation with Chebyshev Polynomials
-#
-# function bellman_operator!(prim::Primitives, v::Array{Float64})
-#   # initialize
-#   Tv = fill(Inf,prim.w_size)
-#   wprime_indices = zeros(Int,(prim.w_size,2))
-#   wprime = zeros(prim.w_size,2)
-#   tau = zeros(prim.w_size,2)
-#
-#   # loop over promised utility values
-#   for w_index in 1:prim.w_size
-#     w = prim.w_vals[w_index]
-#
-#     # initialize cost for (wprimeH,wprimeL) combinations
-#     min_cost = Inf
-#
-#     # find min cost for each (wprimeH,wprimeL) combination
-#     for wprimeH_index in 1:prim.w_size
-#       wprimeH = prim.w_vals[wprimeH_index]
-#       for wprimeL_index in 1:prim.w_size
-#         wprimeL = prim.w_vals[wprimeL_index]
-#
-#         # find transfer schedule determined by promise constraint and binding IC
-#         # check that (tauH,tauL) is defined
-#         if ((wprimeL-1)*prim.beta - w + 1)/
-#         (((prim.pi-1)*exp(prim.yH-prim.yL)-prim.pi)*(prim.beta-1)) > 0 &&
-#         ((1-prim.pi)*prim.beta*(wprimeH-wprimeL)*exp(prim.yH-prim.yL) +
-#           prim.beta*(prim.pi*wprimeH + (1-prim.pi)*wprimeL) - w + 1 - prim.beta)/
-#         (((prim.pi-1)*exp(prim.yH-prim.yL)-prim.pi)*(prim.beta-1)) > 0
-#
-#           tauL = -prim.yH -
-#             log(
-#               ((wprimeL-1)*prim.beta - w + 1)/
-#               (((prim.pi-1)*exp(prim.yH-prim.yL)-prim.pi)*(prim.beta-1))
-#               )
-#           tauH = -prim.yH -
-#             log(
-#               ((1-prim.pi)*prim.beta*(wprimeH-wprimeL)*exp(prim.yH-prim.yL) +
-#                 prim.beta*(prim.pi*wprimeH + (1-prim.pi)*wprimeL) - w + 1 - prim.beta)/
-#               (((prim.pi-1)*exp(prim.yH-prim.yL)-prim.pi)*(prim.beta-1))
-#               )
-#
-#           # calculate cost given wprimeH, wprimeL, tauH, tauL
-#           cost = (1-prim.q)*(prim.pi*tauH + (1-prim.pi)*tauL) +
-#             prim.q*(prim.pi*v[wprimeH_index] + (1-prim.pi)*v[wprimeL_index])
-#
-#           if cost < min_cost
-#             min_cost = cost
-#             wprime_indices[w_index,1] = wprimeH_index
-#             wprime_indices[w_index,2] = wprimeL_index
-#             wprime[w_index,1] = prim.w_vals[wprimeH_index]
-#             wprime[w_index,2] = prim.w_vals[wprimeL_index]
-#             tau[w_index,1] = tauH
-#             tau[w_index,2] = tauL
-#           end
-#
-#         end
-#
-#       end
-#     end
-#     Tv[w_index] = min_cost
-#   end
-#   Tv, wprime_indices, wprime, tau
-# end
-=======
 
 # Chebyshev approximation (order 3)
 
@@ -314,7 +243,6 @@ function bellman_chebyshev_jump!(prim::Primitives, v::Array{Float64})
   Tv, wprime_vals, tau_vals, cheby_coeff
 
 end
->>>>>>> chebyshev
 
 ## Value Function Iteration
 
