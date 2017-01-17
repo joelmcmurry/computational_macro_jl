@@ -6,6 +6,7 @@ Creates Williamson (1998) model and utilities
 using QuantEcon: gridmake
 using JuMP
 using NLopt
+using Interpolations
 
 ## Create composite type to hold model primitives
 
@@ -20,34 +21,31 @@ type Primitives
   w_min :: Float64 ## minimum incentive compatible expected utility
   w_max :: Float64 ## maximum feasible expected utility
   w_size :: Int64 ## size of expected utility grid
+  w_size_itp :: Int64 ## size of interpolated decision rule grid
   w_vals :: Vector{Float64} ## expected utility grid
+  w_vals_itp :: Vector{Float64} ## expected utility grid size of interpolated grids
   cheby_unit_nodes :: Vector{Float64} ## Chebyshev nodes on [-1,1]
-  chebyshev_flag::Int ## flag == 1 if using Chebyshev approximation
 end
 
 #= Outer Constructor for Primitives. Supplies default values, field
 names, and creates grid objects =#
 
-function Primitives(;beta::Float64=0.99, q::Float64=0.91, x::Float64=1.0,
+function Primitives(;beta::Float64=0.89, q::Float64=0.91, x::Float64=1.0,
   yH::Float64=1.6, yL::Float64=0.4, pi::Float64=0.5,
-  ce::Float64=0.4713, w_size::Int64=5, chebyshev_flag::Int=1)
+  ce::Float64=0.4713, w_size::Int64=5, w_size_itp::Int64=500)
 
   # Calculate w_min and w_max
 
   w_min = pi*(1-exp(-(yH - yL)))
   w_max = pi*(1-exp(-(yH + x))) + (1-pi)*(1-exp(-(yL + x)))
 
-  # Utility grid
+  # Utility grids
 
-  if chebyshev_flag == 1
-    cheby_unit_nodes, w_vals = cheby_nodes!(w_min,w_max,w_size)
-  else
-    w_vals = linspace(w_min,w_max,w_size)
-    cheby_unit_nodes = zeros(w_size)
-  end
+  cheby_unit_nodes, w_vals = cheby_nodes!(w_min,w_max,w_size)
+  w_vals_itp = linspace(w_min,w_max,w_size_itp)
 
   primitives = Primitives(beta, q, x, yH, yL, pi, ce,
-    w_min, w_max, w_size, w_vals, cheby_unit_nodes, chebyshev_flag)
+    w_min, w_max, w_size, w_size_itp, w_vals, w_vals_itp, cheby_unit_nodes)
 
   return primitives
 
@@ -59,35 +57,37 @@ type Results
     v::Array{Float64}
     Tv::Array{Float64}
     num_iter::Int
-    wprime_indices::Array{Int,2}
     wprime_vals::Array{Float64,2}
+    wprime_indices_itp::Array{Int,2}
     tau_vals::Array{Float64,2}
+    tau_vals_itp::Array{Float64,2}
     statdist::Array{Float64}
     num_dist::Int
-    principal_value::Array{Float64}
     consumption::Array{Float64,2}
     cheby_coeff::Vector{Float64}
 
     function Results(prim::Primitives)
         v = zeros(prim.w_size) # initialize cost with zeros
-        wprime_indices = zeros(Int,(prim.w_size,2)) # initialize wprime choice index with zeros
         wprime_vals = zeros(prim.w_size,2) # initialize wprime choice with zeros
-        statdist = ones(prim.w_size)*(1/(prim.w_size))# initialize stationary distribution with uniform
+        wprime_indices_itp = zeros(Int,(prim.w_size_itp,2)) # initialize wprime choice index with zeros
+        statdist = ones(prim.w_size_itp)*(1/(prim.w_size_itp))# initialize stationary distribution with uniform
         cheby_coeff = zeros(4) # initialize Chebyshev coefficients with zeros
-        res = new(v, similar(v), 0, wprime_indices, wprime_vals,
-          similar(wprime_vals), statdist, 0, similar(v), similar(wprime_vals), cheby_coeff)
+        res = new(v, similar(v), 0, wprime_vals, wprime_indices_itp,
+          similar(wprime_vals), similar(wprime_indices_itp,Float64), statdist, 0,
+          similar(wprime_vals), cheby_coeff)
 
         res
     end
 
     # Version w/ initial v
     function Results(prim::Primitives,v::Array{Float64})
-        wprime_indices = zeros(Int,(prim.w_size,2))
-        wprime_vals = zeros(prim.w_size,2)
-        statdist = ones(prim.w_size)*(1/(prim.w_size))
-        cheby_coeff = zeros(4)
-        res = new(v, similar(v), 0, wprime_indices, wprime_vals,
-          similar(wprime_vals), statdist, 0, similar(v), similar(wprime_vals), cheby_coeff)
+      wprime_vals = zeros(prim.w_size,2)
+      wprime_indices_itp = zeros(Int,(prim.w_size_itp,2))
+      statdist = ones(prim.w_size_itp)*(1/(prim.w_size_itp))
+      cheby_coeff = zeros(4)
+      res = new(v, similar(v), 0, wprime_vals, wprime_indices_itp,
+        similar(wprime_vals), similar(wprime_indices_itp,Float64), statdist, 0,
+        similar(wprime_vals), cheby_coeff)
 
         res
     end
@@ -95,22 +95,22 @@ end
 
 ## Solve Program
 
-#Without initial value function (will be initialized at zeros)
-function SolveProgram(bellman::Function,prim::Primitives;
+# Without initial value function (will be initialized at zeros)
+function SolveProgram(prim::Primitives;
   max_iter_vfi::Integer=500, epsilon_vfi::Real=1e-3,
   max_iter_statdist::Integer=500, epsilon_statdist::Real=1e-3)
     res = Results(prim)
-    vfi!(bellman,prim, res, max_iter_vfi, epsilon_vfi)
+    vfi!(prim, res, max_iter_vfi, epsilon_vfi)
     create_statdist!(prim, res, max_iter_statdist, epsilon_statdist)
     res
 end
 
 # With Initial value function
-function SolveProgram(bellman::Function,prim::Primitives, v::Array{Float64};
+function SolveProgram(prim::Primitives, v::Array{Float64};
   max_iter_vfi::Integer=500, epsilon_vfi::Real=1e-3,
   max_iter_statdist::Integer=500, epsilon_statdist::Real=1e-3)
     res = Results(prim, v)
-    vfi!(bellman,prim, res, max_iter_vfi, epsilon_vfi)
+    vfi!(prim, res, max_iter_vfi, epsilon_vfi)
     create_statdist!(prim, res, max_iter_statdist, epsilon_statdist)
     res
 end
@@ -178,245 +178,56 @@ function cheby_approx!(x,cheby_coeff::Array,lower,upper)
   return fhat
 end
 
-## Bellman Operators
-
-# Grid Search
-
-function bellman_gridsearch!(prim::Primitives, v::Array{Float64})
-  # initialize
-  Tv = fill(Inf,prim.w_size)
-  wprime_indices = zeros(Int,(prim.w_size,2))
-  wprime_vals = zeros(prim.w_size,2)
-  tau_vals = zeros(prim.w_size,2)
-
-  # loop over promised utility values
-  for w_index in 1:prim.w_size
-    w = prim.w_vals[w_index]
-
-    # initialize cost for (wprimeH,wprimeL) combinations
-    min_cost = Inf
-
-    # find min cost for each (wprimeH,wprimeL) combination
-    for wprimeH_index in 1:prim.w_size
-      wprimeH = prim.w_vals[wprimeH_index]
-      for wprimeL_index in 1:prim.w_size
-        wprimeL = prim.w_vals[wprimeL_index]
-
-        # find transfer schedule determined by promise constraint and binding IC
-        # check that (tauH,tauL) is defined and within constraints
-        if (((wprimeL-1)*prim.beta - w + 1)/
-        (prim.beta*prim.pi*exp(prim.yH-prim.yL)-prim.pi*prim.beta -
-          prim.beta*exp(prim.yH-prim.yL)-prim.pi*exp(prim.yH-prim.yL) +
-          prim.pi + exp(prim.yH-prim.yL))) > 0 &&
-          (-(prim.beta*prim.pi*wprimeH*exp(prim.yH-prim.yL) -
-            prim.beta*prim.pi*wprimeL*exp(prim.yH-prim.yL) -
-            prim.pi*prim.beta*wprimeH + prim.pi*prim.beta*wprimeL -
-            prim.beta*wprimeH*exp(prim.yH-prim.yL) +
-            prim.beta*wprimeL*exp(prim.yH-prim.yL) -
-            prim.beta*wprimeL + prim.beta + w - 1)
-            /
-          ((prim.beta-1)*(prim.pi*exp(prim.yH-prim.yL)-prim.pi-exp(prim.yH-prim.yL)))) > 0 &&
-        -prim.yH <= -prim.yH -
-          log(
-            -(prim.beta*prim.pi*wprimeH*exp(prim.yH-prim.yL) -
-              prim.beta*prim.pi*wprimeL*exp(prim.yH-prim.yL) -
-              prim.pi*prim.beta*wprimeH + prim.pi*prim.beta*wprimeL -
-              prim.beta*wprimeH*exp(prim.yH-prim.yL) +
-              prim.beta*wprimeL*exp(prim.yH-prim.yL) -
-              prim.beta*wprimeL + prim.beta + w - 1)
-              /
-            ((prim.beta-1)*(prim.pi*exp(prim.yH-prim.yL)-prim.pi-exp(prim.yH-prim.yL)))
-            ) <= prim.x &&
-        -prim.yL <= -prim.yH -
-          log(
-            ((wprimeL-1)*prim.beta - w + 1)/
-            (prim.beta*prim.pi*exp(prim.yH-prim.yL)-prim.pi*prim.beta -
-              prim.beta*exp(prim.yH-prim.yL)-prim.pi*exp(prim.yH-prim.yL) +
-              prim.pi + exp(prim.yH-prim.yL))
-            ) <= prim.x
-
-          tauL = -prim.yH -
-            log(
-              ((wprimeL-1)*prim.beta - w + 1)/
-              (prim.beta*prim.pi*exp(prim.yH-prim.yL)-prim.pi*prim.beta -
-                prim.beta*exp(prim.yH-prim.yL)-prim.pi*exp(prim.yH-prim.yL) +
-                prim.pi + exp(prim.yH-prim.yL))
-              )
-          tauH = -prim.yH -
-            log(
-              -(prim.beta*prim.pi*wprimeH*exp(prim.yH-prim.yL) -
-                prim.beta*prim.pi*wprimeL*exp(prim.yH-prim.yL) -
-                prim.pi*prim.beta*wprimeH + prim.pi*prim.beta*wprimeL -
-                prim.beta*wprimeH*exp(prim.yH-prim.yL) +
-                prim.beta*wprimeL*exp(prim.yH-prim.yL) -
-                prim.beta*wprimeL + prim.beta + w - 1)
-                /
-              ((prim.beta-1)*(prim.pi*exp(prim.yH-prim.yL)-prim.pi-exp(prim.yH-prim.yL)))
-              )
-
-          # calculate cost given wprimeH, wprimeL, tauH, tauL
-          cost = (1-prim.q)*(prim.pi*tauH + (1-prim.pi)*tauL) +
-            prim.q*(prim.pi*v[wprimeH_index] + (1-prim.pi)*v[wprimeL_index])
-
-          if cost < min_cost
-            min_cost = cost
-            wprime_indices[w_index,1] = wprimeH_index
-            wprime_indices[w_index,2] = wprimeL_index
-            wprime_vals[w_index,1] = prim.w_vals[wprimeH_index]
-            wprime_vals[w_index,2] = prim.w_vals[wprimeL_index]
-            tau_vals[w_index,1] = tauH
-            tau_vals[w_index,2] = tauL
-          end
-
-        end
-
-      end
-    end
-    Tv[w_index] = min_cost
-  end
-  Tv, wprime_indices, wprime_vals, tau_vals
-end
-
-testgrid = bellman_gridsearch!(prim,v)
-
-# Alternate grid search: look over transfers
-
-function bellman_gridsearch_alt!(prim::Primitives, v::Array{Float64})
-  # initialize
-  Tv = fill(Inf,prim.w_size)
-  wprime_vals = zeros(prim.w_size,2)
-  tau_vals = zeros(prim.w_size,2)
-
-  tausize = 100
-
-  tauL_vals = linspace(-prim.yL,prim.x,tausize)
-  tauH_vals = linspace(-prim.yH,prim.x,tausize)
-
-  # loop over promised utility values
-  for w_index in 1:prim.w_size
-    w = prim.w_vals[w_index]
-
-    # initialize cost for (wprimeH,wprimeL) combinations
-    min_cost = Inf
-
-    # find min cost for each (wprimeH,wprimeL) combination
-    for tauH_index in 1:tausize
-      tauH = tauH_vals[tauH_index]
-      for tauL_index in 1:tausize
-        tauL = tauL_vals[tauL_index]
-
-        # find transfer schedule determined by promise constraint and binding IC
-        # check that (tauH,tauL) is defined and within constraints
-        wprimeH = (1/prim.beta)*(prim.pi*exp(-prim.yL-tauL)*prim.beta -
-          prim.pi*exp(-prim.yH-tauL)*prim.beta - prim.pi*exp(-prim.yL-tauL) +
-          prim.pi*exp(-prim.yH-tauL) - prim.beta*exp(-prim.yH-tauH) -
-          exp(-prim.yL-tauL)*prim.beta + prim.beta*exp(-prim.yH-tauL) +
-          exp(-prim.yH-tauH) + exp(-prim.yL-tauL) - exp(-prim.yH-tauL) +
-          prim.beta + w - 1)
-        wprimeL = (1/prim.beta)*(prim.pi*exp(-prim.yL-tauL)*prim.beta -
-          prim.pi*exp(-prim.yH-tauL)*prim.beta - prim.pi*exp(-prim.yL-tauL) +
-          prim.pi*exp(-prim.yH-tauL) - exp(-prim.yL-tauL)*prim.beta +
-          exp(-prim.yL-tauL) + prim.beta + w - 1)
-
-        if prim.w_min <= wprimeH <= prim.w_max && prim.w_min <= wprimeL <= prim.w_max
-
-          # calculate cost given wprimeH, wprimeL, tauH, tauL
-          cost = (1-prim.q)*(prim.pi*tauH + (1-prim.pi)*tauL) +
-            prim.q*(prim.pi*v[wprimeH_index] + (1-prim.pi)*v[wprimeL_index])
-
-          if cost < min_cost
-            min_cost = cost
-            wprime_vals[w_index,1] = wprimeH
-            wprime_vals[w_index,2] = wprimeL
-            tau_vals[w_index,1] = tauH
-            tau_vals[w_index,2] = tauL
-          end
-
-        end
-
-      end
-    end
-    Tv[w_index] = min_cost
-  end
-  Tv, wprime_vals, tau_vals
-end
-
-testgrid_alt = bellman_gridsearch_alt!(prim,v)
-
-# Interpolation with Chebyshev Polynomials
-
-# JuMP
+## Bellman Operator
 
 function bellman_chebyshev_jump!(prim::Primitives, v::Array{Float64})
   # initialize
   Tv = fill(Inf,prim.w_size)
-  wprime_indices = zeros(Int,(prim.w_size,2))
   wprime_vals = zeros(prim.w_size,2)
   tau_vals = zeros(prim.w_size,2)
 
   # find Chebyshev coefficients
   cheby_coeff = cheby_coeff_three!(v,prim.cheby_unit_nodes)
 
-  # construct model for JuMP
-  m = Model(solver=NLoptSolver(algorithm=:LD_SLSQP))
-
-  # choice variables
-  @variable(m, prim.w_min <= wprimeH <= prim.w_max, start = (prim.w_min + prim.w_max)/2)
-  @variable(m, prim.w_min <= wprimeL <= prim.w_max, start = (prim.w_min + prim.w_max)/2)
-  @variable(m, -prim.yH <= tauH <= prim.x, start = prim.x)
-  @variable(m, -prim.yL <= tauL <= prim.x, start = prim.x)
-
-  # set promised utility parameter to first value
-  @NLparameter(m, w == prim.w_vals[1])
-
-  # objective function
-  # @NLobjective(m, Min,
-  # (1-prim.q)*(prim.pi*tauH + (1-prim.pi)*tauL) +
-  # prim.q*(prim.pi*
-  #   (cheby_coeff[1] + cheby_coeff[2]*(2*(wprimeH-prim.w_min)/(prim.w_max-prim.w_min) - 1) +
-  #   cheby_coeff[3]*(2*(2*(wprimeH-prim.w_min)/(prim.w_max-prim.w_min) - 1)^2 - 1) +
-  #   cheby_coeff[4]*(4*(2*(wprimeH-prim.w_min)/(prim.w_max-prim.w_min) - 1)^3 -
-  #     3*(2*(wprimeH-prim.w_min)/(prim.w_max-prim.w_min) - 1))) +
-  # (1-prim.pi)*
-  # (cheby_coeff[1] + cheby_coeff[2]*(2*(wprimeL-prim.w_min)/(prim.w_max-prim.w_min) - 1) +
-  # cheby_coeff[3]*(2*(2*(wprimeL-prim.w_min)/(prim.w_max-prim.w_min) - 1)^2 - 1) +
-  # cheby_coeff[4]*(4*(2*(wprimeL-prim.w_min)/(prim.w_max-prim.w_min) - 1)^3 -
-  #   3*(2*(wprimeL-prim.w_min)/(prim.w_max-prim.w_min) - 1)))
-  # )
-  # )
-
-  # objective function
-  @NLobjective(m, Max,
-  (1-prim.q)*(prim.pi*(prim.x-tauH) + (1-prim.pi)*(prim.x-tauL)) +
-  prim.q*(prim.pi*
-    (cheby_coeff[1] + cheby_coeff[2]*(2*(wprimeH-prim.w_min)/(prim.w_max-prim.w_min) - 1) +
-    cheby_coeff[3]*(2*(2*(wprimeH-prim.w_min)/(prim.w_max-prim.w_min) - 1)^2 - 1) +
-    cheby_coeff[4]*(4*(2*(wprimeH-prim.w_min)/(prim.w_max-prim.w_min) - 1)^3 -
-      3*(2*(wprimeH-prim.w_min)/(prim.w_max-prim.w_min) - 1))) +
-  (1-prim.pi)*
-  (cheby_coeff[1] + cheby_coeff[2]*(2*(wprimeL-prim.w_min)/(prim.w_max-prim.w_min) - 1) +
-  cheby_coeff[3]*(2*(2*(wprimeL-prim.w_min)/(prim.w_max-prim.w_min) - 1)^2 - 1) +
-  cheby_coeff[4]*(4*(2*(wprimeL-prim.w_min)/(prim.w_max-prim.w_min) - 1)^3 -
-    3*(2*(wprimeL-prim.w_min)/(prim.w_max-prim.w_min) - 1)))
-  ) - prim.q/(1-w)
-  )
-
-  # constraints
-
-  # full constraints
-  @NLconstraint(m, w == (1-prim.beta)*(prim.pi*(1-exp(-prim.yH - tauH)) +
-    (1-prim.pi)*(1-exp(-prim.yL - tauL))) +
-    prim.beta*(prim.pi*wprimeH + (1-prim.pi)*wprimeL))
-  @NLconstraint(m, (1-prim.beta)*(1-exp(-prim.yH - tauL)) + prim.beta*wprimeL <=
-    (1-prim.beta)*(1-exp(-prim.yH - tauH)) + prim.beta*wprimeH)
-  @NLconstraint(m, (1-prim.beta)*(1-exp(-prim.yL - tauH)) + prim.beta*wprimeH <=
-    (1-prim.beta)*(1-exp(-prim.yL - tauL)) + prim.beta*wprimeL)
-
   # loop over promised utility values
   for w_index in 1:prim.w_size
 
-    # update promised utility parameter (redundant in first iteration)
-    setvalue(w, prim.w_vals[w_index])
+    # construct model for JuMP
+    m = Model(solver=NLoptSolver(algorithm=:LD_SLSQP))
+
+    # choice variables
+    @variable(m, prim.w_min <= wprimeH <= prim.w_max, start = (prim.w_min + prim.w_max)/2)
+    @variable(m, prim.w_min <= wprimeL <= prim.w_max, start = (prim.w_min + prim.w_max)/2)
+    @variable(m, -prim.yH <= tauH <= prim.x, start = prim.x)
+    @variable(m, -prim.yL <= tauL <= prim.x, start = prim.x)
+
+    # promised utility
+    @NLparameter(m, w == prim.w_vals[w_index])
+
+    # objective function
+    @NLobjective(m, Max,
+    (1-prim.q)*(prim.pi*(prim.x-tauH) + (1-prim.pi)*(prim.x-tauL)) +
+    prim.q*(prim.pi*
+      (cheby_coeff[1] + cheby_coeff[2]*(2*(wprimeH-prim.w_min)/(prim.w_max-prim.w_min) - 1) +
+      cheby_coeff[3]*(2*(2*(wprimeH-prim.w_min)/(prim.w_max-prim.w_min) - 1)^2 - 1) +
+      cheby_coeff[4]*(4*(2*(wprimeH-prim.w_min)/(prim.w_max-prim.w_min) - 1)^3 -
+        3*(2*(wprimeH-prim.w_min)/(prim.w_max-prim.w_min) - 1))) +
+    (1-prim.pi)*
+    (cheby_coeff[1] + cheby_coeff[2]*(2*(wprimeL-prim.w_min)/(prim.w_max-prim.w_min) - 1) +
+    cheby_coeff[3]*(2*(2*(wprimeL-prim.w_min)/(prim.w_max-prim.w_min) - 1)^2 - 1) +
+    cheby_coeff[4]*(4*(2*(wprimeL-prim.w_min)/(prim.w_max-prim.w_min) - 1)^3 -
+      3*(2*(wprimeL-prim.w_min)/(prim.w_max-prim.w_min) - 1)))
+     )
+    )
+
+    # constraints
+    @NLconstraint(m, w == (1-prim.beta)*(prim.pi*(1-exp(-prim.yH - tauH)) +
+      (1-prim.pi)*(1-exp(-prim.yL - tauL))) +
+      prim.beta*(prim.pi*wprimeH + (1-prim.pi)*wprimeL))
+    @NLconstraint(m, (1-prim.beta)*(1-exp(-prim.yH - tauL)) + prim.beta*wprimeL <=
+      (1-prim.beta)*(1-exp(-prim.yH - tauH)) + prim.beta*wprimeH)
+    @NLconstraint(m, (1-prim.beta)*(1-exp(-prim.yL - tauH)) + prim.beta*wprimeH <=
+      (1-prim.beta)*(1-exp(-prim.yL - tauL)) + prim.beta*wprimeL)
 
     # solve problem given promised utility
     solve(m)
@@ -429,18 +240,13 @@ function bellman_chebyshev_jump!(prim::Primitives, v::Array{Float64})
     tau_vals[w_index,2] = getvalue(tauL)
 
   end
-  #Tv, wprime_indices, wprime_vals, tau_vals
   Tv, wprime_vals, tau_vals, cheby_coeff
 
 end
 
-tic()
-testcheb1 = bellman_chebyshev_jump!(prim,v)
-toc()
-
 ## Value Function Iteration
 
-function vfi!(bellman::Function,prim::Primitives, res::Results,
+function vfi!(prim::Primitives, res::Results,
   max_iter::Integer, epsilon::Real)
     if prim.beta == 0.0
         tol = Inf
@@ -452,25 +258,16 @@ function vfi!(bellman::Function,prim::Primitives, res::Results,
 
     for i in 1:max_iter
         # updates Tv and choice arrays in place
-        if bellman == bellman_gridsearch!
-          res.Tv, res.wprime_indices, res.wprime_vals, res.tau_vals = bellman(prim,res.v)
-        elseif bellman == bellman_chebyshev_jump!
-          res.Tv, res.wprime_vals, res.tau_vals, res.cheby_coeff = bellman(prim,res.v)
-        else
-          msg = "Use either Grid Search or JuMP NL Solver"
-          throw(ArgumentError(msg))
-        end
+        res.Tv, res.wprime_vals, res.tau_vals, res.cheby_coeff = bellman_chebyshev_jump!(prim,res.v)
 
         # compute error and update the value with Tv inside results
         err = maxabs(res.Tv .- res.v)
         copy!(res.v, res.Tv)
         res.num_iter += 1
-        println("Iter: ", i, " Error: ", err)
+        #println("Iter: ", i, " Error: ", err)
 
-        if err < tol && bellman == bellman_gridsearch!
-          break
-        elseif err < tol && bellman == bellman_chebyshev_jump!
-          #interp decision rules here
+        if err < tol
+          res.wprime_indices_itp, res.tau_vals_itp = interp_decision!(prim,res)
           break
         end
     end
@@ -478,13 +275,75 @@ function vfi!(bellman::Function,prim::Primitives, res::Results,
     res
 end
 
+## Interpolate decision rules for wprimeH, wprimeL
+
+function interp_decision!(prim::Primitives,res::Results)
+
+    grid_size = prim.w_size_itp
+
+    w_grid = prim.w_vals_itp
+
+    # evenly space "grid_size" number of points between 1 and "w_size"
+    grid_to_itp = linspace(1,prim.w_size,grid_size)
+
+    itp_wprimeH = interpolate(res.wprime_vals[:,1],BSpline(Linear()),OnGrid())
+    itp_wprimeL = interpolate(res.wprime_vals[:,2],BSpline(Linear()),OnGrid())
+
+    itp_tauH_vals = interpolate(res.tau_vals[:,1],BSpline(Linear()),OnGrid())
+    itp_tauL_vals= interpolate(res.tau_vals[:,2],BSpline(Linear()),OnGrid())
+
+    wprime_indices_itp = zeros(grid_size,2)
+    tau_vals_itp = zeros(grid_size,2)
+
+    # wprimeH
+    for domain_index in 1:grid_size
+      mindist = Inf
+      match_index = 0
+
+      # convert grid index to interpolation index
+      itp_index = grid_to_itp[domain_index]
+
+      for search_index in 1:grid_size
+        dist = abs(itp_wprimeH[itp_index] - w_grid[search_index])
+        if dist < mindist
+          mindist = dist
+          match_index = search_index
+        end
+      end
+      wprime_indices_itp[domain_index,1] = match_index
+      tau_vals_itp[domain_index,1] = itp_tauH_vals[itp_index]
+    end
+
+    # wprimeL
+    for domain_index in 1:grid_size
+      mindist = Inf
+      match_index = 0
+
+      # convert grid index to interpolation index
+      itp_index = grid_to_itp[domain_index]
+
+      for search_index in 1:grid_size
+        dist = abs(itp_wprimeL[itp_index] - w_grid[search_index])
+        if dist < mindist
+          mindist = dist
+          match_index = search_index
+        end
+      end
+      wprime_indices_itp[domain_index,2] = match_index
+      tau_vals_itp[domain_index,2] = itp_tauL_vals[itp_index]
+    end
+
+  wprime_indices_itp, tau_vals_itp
+end
+
 ## Find Stationary distribution
 
 function create_statdist!(prim::Primitives, res::Results,
   max_iter::Integer, epsilon::Real)
 
-# number of states (w,y) is 2 times w grid size
-N = 2*prim.w_size
+# number of states (w,y) is 2 times grid size used in decision rule interpolation
+grid_size = prim.w_size_itp
+N = 2*grid_size
 
 #= Create transition matrix Tstar that is N x N, where N is the number
 of (promised utility,endowment) combinations. Each row of Tstar is a
@@ -495,26 +354,26 @@ Tstar = spzeros(N,N)
 for state_today in 1:N
 
   # indentify utility and endowment indices from state index
-  if state_today <= prim.w_size # endowed with yH
+  if state_today <= grid_size # endowed with yH
     w_index = state_today # w index
     endow_index = 1 # yH index
   else # endowed with yL
-    w_index = state_today - prim.w_size # w index
+    w_index = state_today - grid_size # w index
     endow_index = 2 # yL index
   end
 
   # use decision rule to determine w' given (w,y)
-  wprime_index = res.wprime_indices[w_index,endow_index]
+  wprime_index = res.wprime_indices_itp[w_index,endow_index]
 
   # fill in transition matrix using endowment process (iid in this case)
   for state_tomorrow in 1:N
 
-    if state_tomorrow <= prim.w_size # endowment tomorrow is yH
+    if state_tomorrow <= grid_size # endowment tomorrow is yH
       if state_tomorrow == wprime_index
         Tstar[state_today,state_tomorrow] = prim.pi
       end
     else # endowment tomorrow is yL
-      if state_tomorrow - prim.w_size == wprime_index
+      if state_tomorrow - grid_size == wprime_index
         Tstar[state_today,state_tomorrow] = (1-prim.pi)
       end
     end
@@ -546,19 +405,18 @@ res.num_dist = 0
 
   # collapse distribution over (w,y) into distribution over w only
 
-  for w_index in 1:prim.w_size
-    res.statdist[w_index] = tempdist[w_index] + tempdist[w_index + prim.w_size]
+  for w_index in 1:grid_size
+    res.statdist[w_index] = tempdist[w_index] + tempdist[w_index + grid_size]
   end
 
   res
 
 end
 
-## Calculate Principal Value and Agent Consumption
+## Calculate Agent Consumption
 
-function value_consumption!(prim::Primitives,res::Results)
+function consumption!(prim::Primitives,res::Results)
 
-  res.principal_value = -res.v - (1/prim.q)*(1-prim.q)*prim.x
   res.consumption = res.tau_vals + [prim.yH prim.yL].*ones(res.tau_vals)
 
   res
