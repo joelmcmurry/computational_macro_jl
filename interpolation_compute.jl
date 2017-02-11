@@ -37,7 +37,6 @@ xgrid, ygrid = meshgrid(prim.k_vals,prim.K_vals)
 title("Value (linear)")
 ax[:plot_surface](xgrid,ygrid,res_linear.v',rstride=2,
   cstride=2,cmap=ColorMap("jet"),alpha=0.7,linewidth=0.25)
-savefig("C:/Users/j0el/Documents/Wisconsin/899/Problem Sets/PS7/Pictures/val_linear.pgf")
 
 linpolfig = figure()
 ax = linpolfig[:gca](projection="3d")
@@ -46,7 +45,6 @@ xgrid, ygrid = meshgrid(prim.k_vals,prim.K_vals)
 title("Policy (linear)")
 ax[:plot_surface](xgrid,ygrid,res_linear.sigma',rstride=2,
   cstride=2,cmap=ColorMap("jet"),alpha=0.7,linewidth=0.25)
-savefig("C:/Users/j0el/Documents/Wisconsin/899/Problem Sets/PS7/Pictures/pol_linear.pgf")
 
 cubvalfig = figure()
 ax = cubvalfig[:gca](projection="3d")
@@ -55,7 +53,6 @@ xgrid, ygrid = meshgrid(prim.k_vals,prim.K_vals)
 title("Value (cubic, linear)")
 ax[:plot_surface](xgrid,ygrid,res_cubiclinear.v',rstride=2,
   cstride=2,cmap=ColorMap("jet"),alpha=0.7,linewidth=0.25)
-  savefig("C:/Users/j0el/Documents/Wisconsin/899/Problem Sets/PS7/Pictures/val_cubiclinear.pgf")
 
 cubpolfig = figure()
 ax = cubpolfig[:gca](projection="3d")
@@ -64,7 +61,6 @@ xgrid, ygrid = meshgrid(prim.k_vals,prim.K_vals)
 title("Policy (cubic, linear)")
 ax[:plot_surface](xgrid,ygrid,res_cubiclinear.sigma',rstride=2,
   cstride=2,cmap=ColorMap("jet"),alpha=0.7,linewidth=0.25)
-savefig("C:/Users/j0el/Documents/Wisconsin/899/Problem Sets/PS7/Pictures/pol_cubiclinear.pgf")
 
 # Representative K levels for LaTeX file
 
@@ -77,7 +73,6 @@ ylabel("v(k;K=k)")
 legend(loc="lower right")
 title("Value (linear)")
 ax = PyPlot.gca()
-savefig("C:/Users/j0el/Documents/Wisconsin/899/Problem Sets/PS7/Pictures/repval_linear.pgf")
 
 reppolfig_linear = figure()
 plot(prim.k_vals[1:prim.k_size],res_linear.sigma[:,1],color="blue",label="K=0.00",linewidth=2.0)
@@ -88,7 +83,6 @@ ylabel("k'(k;K=k)")
 legend(loc="lower right")
 title("Policy (linear)")
 ax = PyPlot.gca()
-savefig("C:/Users/j0el/Documents/Wisconsin/899/Problem Sets/PS7/Pictures/reppol_linear.pgf")
 
 repvalfig_cubiclinear = figure()
 plot(prim.k_vals[1:prim.k_size],res_cubiclinear.v[:,1],color="blue",label="K=0.00",linewidth=2.0)
@@ -99,7 +93,6 @@ ylabel("v(k;K=k)")
 legend(loc="lower right")
 title("Value (cubic, linear)")
 ax = PyPlot.gca()
-savefig("C:/Users/j0el/Documents/Wisconsin/899/Problem Sets/PS7/Pictures/repval_cubiclinear.pgf")
 
 reppolfig_cubiclinear = figure()
 plot(prim.k_vals[1:prim.k_size],res_cubiclinear.sigma[:,1],color="blue",label="K=0.00",linewidth=2.0)
@@ -110,8 +103,6 @@ ylabel("k'(k;K=k)")
 legend(loc="lower right")
 title("Policy (cubic, linear)")
 ax = PyPlot.gca()
-savefig("C:/Users/j0el/Documents/Wisconsin/899/Problem Sets/PS7/Pictures/reppol_cubiclinear.pgf")
-
 
 ## Isolate calculated value functions and policy functions for k=K
 
@@ -144,7 +135,6 @@ ylabel("v(k;K=k)")
 legend(loc="lower right")
 title("Value k=K (linear)")
 ax = PyPlot.gca()
-savefig("C:/Users/j0el/Documents/Wisconsin/899/Problem Sets/PS7/Pictures/keqK_val_linear.pgf")
 
 keqKpol_linear = figure()
 plot(prim.K_vals[1:prim.K_size],policy_linear,color="red",linewidth=2.0)
@@ -153,7 +143,6 @@ ylabel("k'(k;K=k)")
 legend(loc="lower right")
 title("Policy k=K (linear)")
 ax = PyPlot.gca()
-savefig("C:/Users/j0el/Documents/Wisconsin/899/Problem Sets/PS7/Pictures/keqK_policy_linear.pgf")
 
 keqKval_cubiclinear = figure()
 plot(prim.K_vals[1:prim.K_size],value_cubiclinear,color="green",linewidth=2.0)
@@ -162,7 +151,6 @@ ylabel("v(k;K=k)")
 legend(loc="lower right")
 title("Value k=K (cubic, linear)")
 ax = PyPlot.gca()
-savefig("C:/Users/j0el/Documents/Wisconsin/899/Problem Sets/PS7/Pictures/keqK_val_cubiclinear.pgf")
 
 keqKpol_cubiclinear = figure()
 plot(prim.K_vals[1:prim.K_size],policy_cubiclinear,color="green",linewidth=2.0)
@@ -171,7 +159,6 @@ ylabel("k'(k;K=k)")
 legend(loc="lower right")
 title("Policy k=K (cubic, linear)")
 ax = PyPlot.gca()
-savefig("C:/Users/j0el/Documents/Wisconsin/899/Problem Sets/PS7/Pictures/keqK_policy_cubiclinear.pgf")
 
 ## Calculate closed form solutions for k=K
 
@@ -189,7 +176,6 @@ ylabel("v(k;K=k)")
 legend(loc="lower right")
 title("Value (closed form)")
 ax = PyPlot.gca()
-savefig("C:/Users/j0el/Documents/Wisconsin/899/Problem Sets/PS7/Pictures/closed_value.pgf")
 
 closedpolfig = figure()
 plot(prim.k_vals[2:prim.k_size],policy_closed[2:prim.k_size],color="blue",linewidth=2.0)
@@ -198,4 +184,3 @@ ylabel("k'(k;K=k)")
 legend(loc="lower right")
 title("Policy (closed form)")
 ax = PyPlot.gca()
-savefig("C:/Users/j0el/Documents/Wisconsin/899/Problem Sets/PS7/Pictures/closed_policy.pgf")

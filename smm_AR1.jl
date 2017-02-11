@@ -63,7 +63,6 @@ function smm(sim_rv::Array,MT::Tuple,n::Int;skipgraph="no")
     title("J(b)")
     ax[:plot_surface](xgrid,ygrid,Jp,rstride=2,
       cstride=2,cmap=ColorMap("jet"),alpha=0.7,linewidth=0.25)
-    savefig(string("C:/Users/j0el/Documents/Wisconsin/899/Problem Sets/PS10/Pictures/",savetitle,".eps"),format="eps")
 
   end
 
@@ -117,7 +116,6 @@ plt[:hist](bhat1_boot[:,1],50,color="red",edgecolor="none",alpha=0.2,label="bhat
 plt[:hist](bhat2_boot[:,1],50,color="blue",alpha=0.2,label="bhat2")
 plt[:legend]()
 title("rho")
-savefig("C:/Users/j0el/Documents/Wisconsin/899/Problem Sets/PS10/Pictures/rhohist.eps",format="eps")
 
 # sigma
 
@@ -126,4 +124,3 @@ plt[:hist](bhat1_boot[:,2],50,color="red",edgecolor="none",alpha=0.2,label="bhat
 plt[:hist](bhat2_boot[:,2],50,color="blue",alpha=0.2,label="bhat2")
 plt[:legend]()
 title("sigma")
-savefig("C:/Users/j0el/Documents/Wisconsin/899/Problem Sets/PS10/Pictures/sigmahist.eps",format="eps")

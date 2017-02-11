@@ -273,7 +273,6 @@ ylabel("Avg K")
 legend(loc="lower right")
 title("Average Capital")
 ax = PyPlot.gca()
-savefig("C:/Users/j0el/Documents/Wisconsin/899/Problem Sets/PS8/Pictures/avg_K.pgf")
 
 # Sample agent asset holdings
 
@@ -293,5 +292,4 @@ for i in 1:sample_size
   legend(loc="lower right")
   title(sampletitle)
   ax = PyPlot.gca()
-  savefig(string("C:/Users/j0el/Documents/Wisconsin/899/Problem Sets/PS8/Pictures/",samplesave,".pgf"))
 end

@@ -213,7 +213,6 @@ legend(loc="lower right")
 title("Value Functions (Pooling - No Bankruptcy)")
 ax = PyPlot.gca()
 ax[:set_ylim]((-20,2))
-savefig("C:/Users/j0el/Documents/Wisconsin/899/Problem Sets/PS4b/Pictures/valuefunctions0_pool.pgf")
 
 valfig1 = figure()
 plot(a_vals_value_emp1_pool,value_emp1_pool,color="green",linewidth=2.0,label="Employed (h=1)")
@@ -224,7 +223,6 @@ legend(loc="lower right")
 title("Value Functions (Pooling - Bankruptcy)")
 ax = PyPlot.gca()
 ax[:set_ylim]((-20,2))
-savefig("C:/Users/j0el/Documents/Wisconsin/899/Problem Sets/PS4b/Pictures/valuefunctions1_pool.pgf")
 
 # Plot value function
 
@@ -239,7 +237,6 @@ title("Policy Functions (Pooling - No Bankruptcy)")
 ax = PyPlot.gca()
 ax[:set_ylim]((-1,5))
 ax[:set_xlim]((-0.525,5))
-savefig("C:/Users/j0el/Documents/Wisconsin/899/Problem Sets/PS4b/Pictures/policyfunctions0_pool.pgf")
 
 polfig1 = figure()
 plot(a_vals_policy_emp1_pool,policy_emp1_pool,color="green",linewidth=2.0,label="Employed (h=1)")
@@ -252,7 +249,6 @@ title("Policy Functions (Pooling - Bankruptcy)")
 ax = PyPlot.gca()
 ax[:set_ylim]((-1,5))
 ax[:set_xlim]((0,5))
-savefig("C:/Users/j0el/Documents/Wisconsin/899/Problem Sets/PS4b/Pictures/policyfunctions1_pool.pgf")
 
 # Plot default decision rule
 
@@ -266,7 +262,6 @@ title("Default Decision Rule (Pooling)")
 ax = PyPlot.gca()
 ax[:set_ylim]((-1,2))
 ax[:set_xlim]((-0.525,5))
-savefig("C:/Users/j0el/Documents/Wisconsin/899/Problem Sets/PS4b/Pictures/decisionrule_pool.pgf")
 
 # Bond prices
 
@@ -280,7 +275,6 @@ title("Bond Prices (Pooling)")
 ax = PyPlot.gca()
 ax[:set_ylim]((0,1))
 ax[:set_xlim]((-0.525,5))
-savefig("C:/Users/j0el/Documents/Wisconsin/899/Problem Sets/PS4b/Pictures/bondprices_pool.pgf")
 
 # Distribution
 
@@ -289,27 +283,23 @@ PyPlot.bar(prim_pool.a_vals,results_pool.statdist[1:prim_pool.a_size],
   width=0.1,alpha=0.5,color="blue",label="mu(a,s=1,h=0)")
 title("Distribution - Pooling (Employed/No-Bankruptcy)")
 legend(loc="upper right")
-savefig("C:/Users/j0el/Documents/Wisconsin/899/Problem Sets/PS4b/Pictures/distemp0_pool.pgf")
 
 distfig2 = figure()
 PyPlot.bar(prim_pool.a_vals,results_pool.statdist[prim_pool.a_size+1:prim_pool.N],
   width=0.1,alpha=0.5,color="red",label="mu(a,s=0.05,h=0)")
 title("Distribution - Pooling (Unemployed/No-Bankruptcy)")
 legend(loc="upper right")
-savefig("C:/Users/j0el/Documents/Wisconsin/899/Problem Sets/PS4b/Pictures/distunemp0_pool.pgf")
 
 distfig3 = figure()
 PyPlot.bar(prim_pool.a_vals,results_pool.statdist[prim_pool.N+1:prim_pool.N+prim_pool.a_size],
   width=0.1,alpha=0.5,color="green",label="mu(a,s=1,h=1)")
 title("Distribution - Pooling (Employed/Bankruptcy)")
 legend(loc="upper right")
-savefig("C:/Users/j0el/Documents/Wisconsin/899/Problem Sets/PS4b/Pictures/distemp1_pool.pgf")
 
 distfig4 = figure()
 PyPlot.bar(prim_pool.a_vals,results_pool.statdist[prim_pool.N+prim_pool.a_size+1:prim_pool.N*2],width=0.1,alpha=0.5,color="yellow",label="mu(a,s=0.05,h=1)")
 title("Distribution - Pooling (Unemployed/Bankruptcy)")
 legend(loc="upper right")
-savefig("C:/Users/j0el/Documents/Wisconsin/899/Problem Sets/PS4b/Pictures/distunemp1_pool.pgf")
 
 # Consumption Equivalents
 
@@ -322,7 +312,6 @@ title("Consumption Equivalents (h=0)")
 ax = PyPlot.gca()
 ax[:set_ylim]((0,0.1))
 ax[:set_xlim]((-0.525,5))
-savefig("C:/Users/j0el/Documents/Wisconsin/899/Problem Sets/PS4b/Pictures/consequiv0.pgf")
 
 conseq1 = figure()
 plot(prim_pool.a_vals,lambda1[:,1],color="green",linewidth=2.0,label="Employed (h=1)")
@@ -333,4 +322,3 @@ title("Consumption Equivalents (h=1)")
 ax = PyPlot.gca()
 ax[:set_ylim]((0,0.02))
 ax[:set_xlim]((-0.525,5))
-savefig("C:/Users/j0el/Documents/Wisconsin/899/Problem Sets/PS4b/Pictures/consequiv1.pgf")

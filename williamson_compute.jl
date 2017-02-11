@@ -82,7 +82,6 @@ title("Principal Value")
 ax = PyPlot.gca()
 ax[:set_xlim]((prim.w_min,prim.w_max))
 ax[:set_ylim]((0,1.8))
-#savefig("C:/Users/j0el/Documents/Wisconsin/899/Problem Sets/Final Project/Pictures/princ_value.pgf")
 
 ## Transfers
 
@@ -97,7 +96,6 @@ legend(loc="lower right")
 ax = PyPlot.gca()
 ax[:set_xlim]((prim.w_min,prim.w_max))
 ax[:set_ylim]((-1.5,1))
-#savefig("C:/Users/j0el/Documents/Wisconsin/899/Problem Sets/Final Project/Pictures/transfers.pgf")
 
 ## Utility Promises
 
@@ -112,7 +110,6 @@ legend(loc="lower right")
 ax = PyPlot.gca()
 ax[:set_xlim]((prim.w_min,prim.w_max))
 ax[:set_ylim]((prim.w_min,prim.w_max))
-#savefig("C:/Users/j0el/Documents/Wisconsin/899/Problem Sets/Final Project/Pictures/utilities.pgf")
 
 ## Consumption
 
@@ -126,7 +123,6 @@ legend(loc="lower right")
 ax = PyPlot.gca()
 ax[:set_xlim]((prim.w_min,prim.w_max))
 ax[:set_ylim]((0,3))
-#savefig("C:/Users/j0el/Documents/Wisconsin/899/Problem Sets/Final Project/Pictures/consumption.pgf")
 
 ## Stationary Distribution
 
@@ -138,4 +134,3 @@ title("Stationary Distribution")
 ax = PyPlot.gca()
 ax[:set_xlim]((prim.w_min,prim.w_max))
 ax[:set_ylim]((0,0.1))
-#savefig("C:/Users/j0el/Documents/Wisconsin/899/Problem Sets/Final Project/Pictures/statdist.pgf")

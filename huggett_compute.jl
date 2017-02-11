@@ -94,7 +94,6 @@ legend(loc="lower right")
 title("Policy Functions")
 ax = PyPlot.gca()
 ax[:set_ylim]((-2,5))
-savefig("C:/Users/j0el/Documents/Wisconsin/899/Problem Sets/PS4/Pictures/policyfunctions.pgf")
 
 # Plot value function
 
@@ -107,8 +106,6 @@ legend(loc="lower right")
 title("Value Functions")
 ax = PyPlot.gca()
 ax[:set_ylim]((-10,5))
-savefig("C:/Users/j0el/Documents/Wisconsin/899/Problem Sets/PS4/Pictures/valuefunctions.pgf")
-
 
 # Plot stationary distribution
 
@@ -119,7 +116,6 @@ bar(huggett.a_vals,huggett_results.statdist[huggett.a_size+1:huggett.N],
   color="red",label="Unemployed")
 title("Wealth Distribution")
 legend(loc="upper right")
-savefig("C:/Users/j0el/Documents/Wisconsin/899/Problem Sets/PS4/Pictures/stationarydistributions.pgf")
 
 ## Plot Lorenz Curve
 
@@ -161,7 +157,6 @@ ylabel("Fraction of Wealth")
 title("Lorenz Curve")
 ax = PyPlot.gca()
 ax[:set_ylim]((-0.06,1))
-savefig("C:/Users/j0el/Documents/Wisconsin/899/Problem Sets/PS4/Pictures/lorenzcurve.pgf")
 
 # Calculate Gini index
 
@@ -226,4 +221,3 @@ ylabel("lambda(a,s)")
 legend(loc="lower right")
 title("Consumption Equivalents")
 ax = PyPlot.gca()
-savefig("C:/Users/j0el/Documents/Wisconsin/899/Problem Sets/PS4/Pictures/consequiv.pgf")

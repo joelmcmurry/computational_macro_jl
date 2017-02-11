@@ -121,7 +121,6 @@ policyfunction_bad = policy_function(v_star[1],v_star[2]
   title("Value Functions")
   ax = PyPlot.gca()
   ax[:set_ylim]((-175,0))
-  savefig("C:/Users/j0el/Documents/Wisconsin/899/Problem Sets/Week 2/Pictures/valuefunctions.pgf")
 
   ## Policy Functions
 
@@ -134,7 +133,6 @@ policyfunction_bad = policy_function(v_star[1],v_star[2]
   title("Policy Functions")
   ax = PyPlot.gca()
   ax[:set_ylim]((0,45))
-  savefig("C:/Users/j0el/Documents/Wisconsin/899/Problem Sets/Week 2/Pictures/policyfunctions.pgf")
 
   ## K' - K
 
@@ -147,4 +145,3 @@ policyfunction_bad = policy_function(v_star[1],v_star[2]
   title("Change in Policy Functions (K'-K)")
   ax = PyPlot.gca()
   ax[:set_ylim]((-2.5,2.5))
-  savefig("C:/Users/j0el/Documents/Wisconsin/899/Problem Sets/Week 2/Pictures/deltapolicyfunctions.pgf")

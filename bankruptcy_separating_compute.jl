@@ -260,7 +260,6 @@ legend(loc="lower right")
 title("Value Functions (Separating - No Bankruptcy)")
 ax = PyPlot.gca()
 ax[:set_ylim]((-20,2))
-savefig("C:/Users/j0el/Documents/Wisconsin/899/Problem Sets/PS4b/Pictures/valuefunctions0_sep.pgf")
 
 valfig1 = figure()
 plot(a_vals_value_emp1_sep,value_emp1_sep,color="green",linewidth=2.0,label="Employed (h=1)")
@@ -271,7 +270,6 @@ legend(loc="lower right")
 title("Value Functions (Separating - Bankruptcy)")
 ax = PyPlot.gca()
 ax[:set_ylim]((-20,2))
-savefig("C:/Users/j0el/Documents/Wisconsin/899/Problem Sets/PS4b/Pictures/valuefunctions1_sep.pgf")
 
 # Plot value function
 
@@ -286,7 +284,6 @@ title("Policy Functions (Separating - No Bankruptcy)")
 ax = PyPlot.gca()
 ax[:set_ylim]((-1,5))
 ax[:set_xlim]((-0.525,5))
-savefig("C:/Users/j0el/Documents/Wisconsin/899/Problem Sets/PS4b/Pictures/policyfunctions0_sep.pgf")
 
 polfig1 = figure()
 plot(a_vals_policy_emp1_sep,policy_emp1_sep,color="green",linewidth=2.0,label="Employed (h=1)")
@@ -299,7 +296,6 @@ title("Policy Functions (Separating - Bankruptcy)")
 ax = PyPlot.gca()
 ax[:set_ylim]((-1,5))
 ax[:set_xlim]((0,5))
-savefig("C:/Users/j0el/Documents/Wisconsin/899/Problem Sets/PS4b/Pictures/policyfunctions1_sep.pgf")
 
 # Plot default decision rule
 
@@ -313,7 +309,6 @@ title("Default Decision Rule (Separating)")
 ax = PyPlot.gca()
 ax[:set_ylim]((-1,2))
 ax[:set_xlim]((-0.525,5))
-savefig("C:/Users/j0el/Documents/Wisconsin/899/Problem Sets/PS4b/Pictures/decisionrule_sep.pgf")
 
 # Bond prices
 
@@ -327,7 +322,6 @@ title("Bond Prices (Separating)")
 ax = PyPlot.gca()
 ax[:set_ylim]((0,1))
 ax[:set_xlim]((-0.525,0))
-savefig("C:/Users/j0el/Documents/Wisconsin/899/Problem Sets/PS4b/Pictures/bondprices_sep.pgf")
 
 # Interest Rates
 
@@ -335,13 +329,11 @@ intfig_emp = figure()
 bar(int_rate_emp,int_dist_emp,width=0.02)
 title("Distribution of Interest Rates (Separating - Employed)")
 legend(loc="upper right")
-savefig("C:/Users/j0el/Documents/Wisconsin/899/Problem Sets/PS4b/Pictures/interestdist_emp_sep.pgf")
 
 intfig_unemp = figure()
 PyPlot.bar(int_rate_unemp,int_dist_unemp,width=0.02)
 title("Distribution of Interest Rates (Separating - Unemployed)")
 legend(loc="upper right")
-savefig("C:/Users/j0el/Documents/Wisconsin/899/Problem Sets/PS4b/Pictures/interestdist_unemp_sep.pgf")
 
 # Distribution
 
@@ -350,24 +342,20 @@ PyPlot.bar(prim_sep.a_vals,results_sep.statdist[1:prim_sep.a_size],
   width=0.1,alpha=0.5,color="blue",label="mu(a,s=1,h=0)")
 title("Distribution - Separating (Employed/No-Bankruptcy)")
 legend(loc="upper right")
-savefig("C:/Users/j0el/Documents/Wisconsin/899/Problem Sets/PS4b/Pictures/distemp0_sep.pgf")
 
 distfig2 = figure()
 PyPlot.bar(prim_sep.a_vals,results_sep.statdist[prim_sep.a_size+1:prim_sep.N],
   width=0.1,alpha=0.5,color="red",label="mu(a,s=0.05,h=0)")
 title("Distribution - Separating (Unemployed/No-Bankruptcy)")
 legend(loc="upper right")
-savefig("C:/Users/j0el/Documents/Wisconsin/899/Problem Sets/PS4b/Pictures/distunemp0_sep.pgf")
 
 distfig3 = figure()
 PyPlot.bar(prim_sep.a_vals,results_sep.statdist[prim_sep.N+1:prim_sep.N+prim_sep.a_size],
   width=0.1,alpha=0.5,color="green",label="mu(a,s=1,h=1)")
 title("Distribution - Separating (Employed/Bankruptcy)")
 legend(loc="upper right")
-savefig("C:/Users/j0el/Documents/Wisconsin/899/Problem Sets/PS4b/Pictures/distemp1_sep.pgf")
 
 distfig4 = figure()
 PyPlot.bar(prim_sep.a_vals,results_sep.statdist[prim_sep.N+prim_sep.a_size+1:prim_sep.N*2],width=0.1,alpha=0.5,color="yellow",label="mu(a,s=0.05,h=1)")
 title("Distribution - Separating (Unemployed/Bankruptcy)")
 legend(loc="upper right")
-savefig("C:/Users/j0el/Documents/Wisconsin/899/Problem Sets/PS4b/Pictures/distunemp1_sep.pgf")
